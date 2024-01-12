@@ -1,5 +1,5 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR, envs
-from time import time
+import time
 from warnings import WarningMessage
 import numpy as np
 import os
@@ -14,6 +14,7 @@ from typing import Tuple, Dict
 from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.envs.base.base_task import BaseTask
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
+from legged_gym.utils.isaacgym_utils import get_euler_xyz
 from legged_gym.utils.helpers import class_to_dict
 from .legged_robot_config import LeggedRobotCfg
 
@@ -60,6 +61,12 @@ class LeggedRobot(BaseTask):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
+            if self.cfg.env.test:
+                elapsed_time = self.gym.get_elapsed_time(self.sim)
+                sim_time = self.gym.get_sim_time(self.sim)
+                if sim_time-elapsed_time>0:
+                    time.sleep(sim_time-elapsed_time)
+            
             if self.device == 'cpu':
                 self.gym.fetch_results(self.sim, True)
             self.gym.refresh_dof_state_tensor(self.sim)
@@ -86,6 +93,7 @@ class LeggedRobot(BaseTask):
         # prepare quantities
         self.base_pos[:] = self.root_states[:, 0:3]
         self.base_quat[:] = self.root_states[:, 3:7]
+        self.rpy[:] = get_euler_xyz(self.base_quat)
         self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
@@ -107,6 +115,7 @@ class LeggedRobot(BaseTask):
         """ Check if environments need to be reset
         """
         self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
+        self.reset_buf |= torch.logical_or(torch.abs(self.rpy[:,1])>1.0, torch.abs(self.rpy[:,0])>0.8)
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
 
@@ -394,9 +403,9 @@ class LeggedRobot(BaseTask):
         noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
         noise_vec[6:9] = noise_scales.gravity * noise_level
         noise_vec[9:12] = 0. # commands
-        noise_vec[12:24] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
-        noise_vec[24:36] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[36:48] = 0. # previous actions
+        noise_vec[12:12+self.num_actions] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+        noise_vec[12+self.num_actions:12+2*self.num_actions] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+        noise_vec[12+2*self.num_actions:12+3*self.num_actions] = 0. # previous actions
 
         return noise_vec
 
@@ -418,6 +427,7 @@ class LeggedRobot(BaseTask):
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         self.base_quat = self.root_states[:, 3:7]
+        self.rpy = get_euler_xyz(self.base_quat)
         self.base_pos = self.root_states[:self.num_envs, 0:3]
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
@@ -628,7 +638,7 @@ class LeggedRobot(BaseTask):
 
     def _reward_base_height(self):
         # Penalize base height away from target
-        base_height = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        base_height = self.root_states[:, 2]
         return torch.square(base_height - self.cfg.rewards.base_height_target)
     
     def _reward_torques(self):

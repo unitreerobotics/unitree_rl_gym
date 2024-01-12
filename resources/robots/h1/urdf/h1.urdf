@@ -680,7 +680,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="torso_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0 0 0"
       rpy="0 0 0" />
@@ -738,7 +738,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="left_shoulder_pitch_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.0055 0.15535 0.42999"
       rpy="0.43633 0 0" />
@@ -796,7 +796,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="left_shoulder_roll_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="-0.0055 0.0565 -0.0165"
       rpy="-0.43633 0 0" />
@@ -854,7 +854,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="left_shoulder_yaw_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0 0 -0.1343"
       rpy="0 0 0" />
@@ -912,7 +912,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="left_elbow_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.0185 0 -0.198"
       rpy="0 0 0" />
@@ -970,7 +970,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="right_shoulder_pitch_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.0055 -0.15535 0.42999"
       rpy="-0.43633 0 0" />
@@ -1028,7 +1028,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="right_shoulder_roll_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="-0.0055 -0.0565 -0.0165"
       rpy="0.43633 0 0" />
@@ -1086,7 +1086,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="right_shoulder_yaw_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0 0 -0.1343"
       rpy="0 0 0" />
@@ -1144,7 +1144,7 @@ Stephen Brawner (brawner@gmail.com)
   </link>
   <joint
     name="right_elbow_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.0185 0 -0.198"
       rpy="0 0 0" />

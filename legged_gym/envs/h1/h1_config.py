@@ -24,12 +24,35 @@ class H1RoughCfg( LeggedRobotCfg ):
            'right_shoulder_yaw_joint' : 0.,
            'right_elbow_joint' : 0.,
         }
+    
+    class env(LeggedRobotCfg.env):
+        num_observations = 42
+        num_actions = 10
+        test = False
+      
 
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness = {'joint': 20.}  # [N*m/rad]
-        damping = {'joint': 0.5}     # [N*m*s/rad]
+          # PD Drive parameters:
+        stiffness = {'hip_yaw': 200,
+                     'hip_roll': 200,
+                     'hip_pitch': 200,
+                     'knee': 300,
+                     'ankle': 40,
+                     'torso': 300,
+                     'shoulder': 100,
+                     "elbow":100,
+                     }  # [N*m/rad]
+        damping = {  'hip_yaw': 5,
+                     'hip_roll': 5,
+                     'hip_pitch': 5,
+                     'knee': 6,
+                     'ankle': 2,
+                     'torso': 6,
+                     'shoulder': 2,
+                     "elbow":2,
+                     }  # [N*m/rad]  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -39,15 +62,26 @@ class H1RoughCfg( LeggedRobotCfg ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/h1/urdf/h1.urdf'
         name = "h1"
         foot_name = "ankle"
-        penalize_contacts_on = ["thigh", "calf"]
-        terminate_after_contacts_on = ["base"]
+        penalize_contacts_on = ["hip", "knee"]
+        terminate_after_contacts_on = ["pelvis"]
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
+        flip_visual_attachments = False
   
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
         base_height_target = 0.98
         class scales( LeggedRobotCfg.rewards.scales ):
-            torques = -0.0002
+            tracking_lin_vel = 1.0
+            tracking_ang_vel = 0.5
+            lin_vel_z = -2.0
+            ang_vel_xy = -1.0
+            orientation = -1.0
+            base_height = -100.0
+            dof_acc = -3.5e-8
+            feet_air_time = 1.0
+            collision = 0.0
+            action_rate = -0.01
+            torques = 0.0
             dof_pos_limits = -10.0
 
 class H1RoughCfgPPO( LeggedRobotCfgPPO ):
@@ -55,6 +89,6 @@ class H1RoughCfgPPO( LeggedRobotCfgPPO ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
-        experiment_name = 'rough_go2'
+        experiment_name = 'h1'
 
   
