@@ -28,7 +28,6 @@ class H1RoughCfg( LeggedRobotCfg ):
     class env(LeggedRobotCfg.env):
         num_observations = 42
         num_actions = 10
-        test = False
       
 
     class control( LeggedRobotCfg.control ):
