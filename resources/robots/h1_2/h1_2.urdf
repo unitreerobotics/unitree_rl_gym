@@ -22,7 +22,7 @@
       <geometry>
         <mesh filename="meshes/pelvis.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -46,7 +46,7 @@
       <geometry>
         <mesh filename="meshes/left_hip_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -75,7 +75,7 @@
       <geometry>
         <mesh filename="meshes/left_hip_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -104,7 +104,7 @@
       <geometry>
         <mesh filename="meshes/left_hip_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -133,7 +133,7 @@
       <geometry>
         <mesh filename="meshes/left_knee_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -162,7 +162,7 @@
       <geometry>
         <mesh filename="meshes/left_ankle_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -191,7 +191,7 @@
       <geometry>
         <mesh filename="meshes/left_ankle_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -222,7 +222,7 @@
       <geometry>
         <mesh filename="meshes/right_hip_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -251,7 +251,7 @@
       <geometry>
         <mesh filename="meshes/right_hip_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -280,7 +280,7 @@
       <geometry>
         <mesh filename="meshes/right_hip_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -309,7 +309,7 @@
       <geometry>
         <mesh filename="meshes/right_knee_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -338,7 +338,7 @@
       <geometry>
         <mesh filename="meshes/right_ankle_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -367,7 +367,7 @@
       <geometry>
         <mesh filename="meshes/right_ankle_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -398,7 +398,7 @@
       <geometry>
         <mesh filename="meshes/torso_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -429,7 +429,7 @@
       <geometry>
         <mesh filename="meshes/left_shoulder_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -458,7 +458,7 @@
       <geometry>
         <mesh filename="meshes/left_shoulder_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -487,7 +487,7 @@
       <geometry>
         <mesh filename="meshes/left_shoulder_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -516,7 +516,7 @@
       <geometry>
         <mesh filename="meshes/left_elbow_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -546,7 +546,7 @@
       <geometry>
         <mesh filename="meshes/left_elbow_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -575,7 +575,7 @@
       <geometry>
         <mesh filename="meshes/left_wrist_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -603,7 +603,7 @@
       <geometry>
         <mesh filename="meshes/wrist_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -634,7 +634,7 @@
       <geometry>
         <mesh filename="meshes/right_shoulder_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -663,7 +663,7 @@
       <geometry>
         <mesh filename="meshes/right_shoulder_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -693,7 +693,7 @@
       <geometry>
         <mesh filename="meshes/right_shoulder_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -722,7 +722,7 @@
       <geometry>
         <mesh filename="meshes/right_elbow_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -752,7 +752,7 @@
       <geometry>
         <mesh filename="meshes/right_elbow_roll_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -781,7 +781,7 @@
       <geometry>
         <mesh filename="meshes/right_wrist_pitch_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -809,7 +809,7 @@
       <geometry>
         <mesh filename="meshes/wrist_yaw_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -835,7 +835,7 @@
       <geometry>
         <mesh filename="meshes/logo_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="white">
         <color rgba="1 1 1 1"/>
       </material>
     </visual>
@@ -872,7 +872,7 @@
       <geometry>
         <mesh filename="meshes/L_hand_base_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -894,7 +894,7 @@
       <geometry>
         <mesh filename="meshes/link11_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -923,7 +923,7 @@
       <geometry>
         <mesh filename="meshes/link12_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -952,7 +952,7 @@
       <geometry>
         <mesh filename="meshes/link13_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -982,7 +982,7 @@
       <geometry>
         <mesh filename="meshes/link14_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1012,7 +1012,7 @@
       <geometry>
         <mesh filename="meshes/link15_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1041,7 +1041,7 @@
       <geometry>
         <mesh filename="meshes/link16_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1071,7 +1071,7 @@
       <geometry>
         <mesh filename="meshes/link17_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1100,7 +1100,7 @@
       <geometry>
         <mesh filename="meshes/link18_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1130,7 +1130,7 @@
       <geometry>
         <mesh filename="meshes/link19_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1159,7 +1159,7 @@
       <geometry>
         <mesh filename="meshes/link20_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1189,7 +1189,7 @@
       <geometry>
         <mesh filename="meshes/link21_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1218,7 +1218,7 @@
       <geometry>
         <mesh filename="meshes/link22_L.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1255,7 +1255,7 @@
       <geometry>
         <mesh filename="meshes/R_hand_base_link.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1277,7 +1277,7 @@
       <geometry>
         <mesh filename="meshes/link11_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1306,7 +1306,7 @@
       <geometry>
         <mesh filename="meshes/link12_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1335,7 +1335,7 @@
       <geometry>
         <mesh filename="meshes/link13_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1365,7 +1365,7 @@
       <geometry>
         <mesh filename="meshes/link14_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1395,7 +1395,7 @@
       <geometry>
         <mesh filename="meshes/link15_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1424,7 +1424,7 @@
       <geometry>
         <mesh filename="meshes/link16_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1454,7 +1454,7 @@
       <geometry>
         <mesh filename="meshes/link17_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1483,7 +1483,7 @@
       <geometry>
         <mesh filename="meshes/link18_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1513,7 +1513,7 @@
       <geometry>
         <mesh filename="meshes/link19_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1542,7 +1542,7 @@
       <geometry>
         <mesh filename="meshes/link20_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1572,7 +1572,7 @@
       <geometry>
         <mesh filename="meshes/link21_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
@@ -1601,7 +1601,7 @@
       <geometry>
         <mesh filename="meshes/link22_R.STL"/>
       </geometry>
-      <material name="">
+      <material name="dark">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
