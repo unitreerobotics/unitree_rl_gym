@@ -18,7 +18,7 @@ Free "light" end effectors can lead to unstable simulation. Thus please be caref
 
 ## Results
 
-https://github.com/user-attachments/assets/ed4d05d0-fd54-4b4f-a7dc-894c6308ace5
+https://github.com/user-attachments/assets/a937e9c4-fe91-4240-88ea-d83b0160cad5
 
 ## Preview Stage
 
