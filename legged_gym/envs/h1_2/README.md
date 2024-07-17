@@ -18,4 +18,4 @@ Free "light" end effectors can lead to unstable simulation. Thus please be caref
 
 ## Preview Stage
 
-**The reward functions is not well tuned and cannot produce satisfactory results at the current stage. A workable version will comming soon.**
+**The reward functions is not well tuned and cannot produce feasible results at the current stage. A feasible version will comming soon.**
