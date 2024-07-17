@@ -16,6 +16,10 @@ We only keep the collision of foot roll links, knee links and the base. Early te
 
 Free "light" end effectors can lead to unstable simulation. Thus please be carefull with the control parameters for the joints that may affect such end effectors.
 
+## Results
+
+https://github.com/user-attachments/assets/ed4d05d0-fd54-4b4f-a7dc-894c6308ace5
+
 ## Preview Stage
 
 **The reward functions are not well tuned and cannot produce satisfactory results at the current stage. A feasible version is comming soon.**
