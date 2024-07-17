@@ -1,5 +1,4 @@
 import sys
-sys.path.append("/home/unitree/unitree_rl_gym")
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 
