@@ -6,11 +6,11 @@ This task utilizes a simplified version of URDF. We fix some joints and ignore m
 
 ### Fixed Joints
 
-We fix all the joints in the hands, wrist and the elbow roll joints, since those joints have very limited effect on the whole body dynamics and are commonly controlled by other controllers.
+We fix all the joints in the hands, wrists and the elbow roll joints, since those joints have very limited effect on the whole body dynamics and are commonly controlled by other controllers.
 
-### Collision
+### Collisions
 
-We only keep the collision of foot roll links, knee links and base. Early termination is majorly check by angular position of the base.
+We only keep the collision of foot roll links, knee links and the base. Early termination is majorly checked by the angular position of the base.
 
 ## Dynamics
 
@@ -18,4 +18,4 @@ Free "light" end effectors can lead to unstable simulation. Thus please be caref
 
 ## Preview Stage
 
-**The reward functions is not well tuned and cannot produce satisfactory results at the current stage. A feasible version is comming soon.**
+**The reward functions are not well tuned and cannot produce satisfactory results at the current stage. A feasible version is comming soon.**
