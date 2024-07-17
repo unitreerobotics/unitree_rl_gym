@@ -10,7 +10,7 @@ We fix all the joints in the hands, wrist and the elbow roll joints, since those
 
 ### Collision
 
-We only keep the collision of foot roll links. Early termination is majorly check by angular position of the base.
+We only keep the collision of foot roll links, knee links and base. Early termination is majorly check by angular position of the base.
 
 ## Dynamics
 
