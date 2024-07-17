@@ -14,8 +14,8 @@ We only keep the collision of foot roll links. Early termination is majorly chec
 
 ## Dynamics
 
-Free "light" end effectors can lead to unstable simulation. Thus please be carefull about the control parameters for the joints that may affect such end effectors.
+Free "light" end effectors can lead to unstable simulation. Thus please be carefull with the control parameters for the joints that may affect such end effectors.
 
 ## Preview Stage
 
-**The reward functions is not well tuned and cannot produce satisfactory results at the current stage. A feasible version will comming soon.**
+**The reward functions is not well tuned and cannot produce satisfactory results at the current stage. A feasible version is comming soon.**
