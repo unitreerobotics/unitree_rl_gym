@@ -6,7 +6,7 @@ This task utilizes a simplified version of URDF. We fix some joints and ignore m
 
 ### Fixed Joints
 
-We fix all the joints in the hands, wrist and the elbow roll joints, since those joints has very limited effect on the whole body dynamics.
+We fix all the joints in the hands, wrist and the elbow roll joints, since those joints have very limited effect on the whole body dynamics and are commonly controlled by other controllers.
 
 ### Collision
 
