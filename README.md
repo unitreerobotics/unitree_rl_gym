@@ -1,6 +1,6 @@
 # Unitree RL GYM
 
-TODO: 简介
+This is a simple example of using Unitree Robots for reinforcement learning, including Unitree Go2, H1, H1_2, G1
 
 ### Installation
 
@@ -42,9 +42,9 @@ TODO: 简介
    * --seed SEED: Random seed.
    * --max_iterations MAX_ITERATIONS: Maximum number of training iterations.
 2. Play:`python legged_gym/scripts/play.py --task=go2`
-    * By default, the loaded policy is the last model of the last run of the experiment folder.
 
-    * Other runs/model iteration can be selected by setting `load_run` and `checkpoint` in the train config.
+   * By default, the loaded policy is the last model of the last run of the experiment folder.
+   * Other runs/model iteration can be selected by setting `load_run` and `checkpoint` in the train config.
 
 ### Robots Demo
 
@@ -63,4 +63,3 @@ https://github.com/user-attachments/assets/a937e9c4-fe91-4240-88ea-d83b0160cad5
 4. G1
 
 https://github.com/user-attachments/assets/0b554137-76bc-43f9-97e1-dd704a33d6a9
-
