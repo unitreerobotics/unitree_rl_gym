@@ -1,7 +1,8 @@
-import sys
-sys.path.append("/home/unitree/unitree_rl_gym")
-from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
+unitree_rl_gym_path = os.path.abspath(__file__ + "../../../../")
+import sys
+sys.path.append(unitree_rl_gym_path)
+from legged_gym import LEGGED_GYM_ROOT_DIR
 
 import isaacgym
 from legged_gym.envs import *
