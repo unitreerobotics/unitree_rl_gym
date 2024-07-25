@@ -22,6 +22,11 @@ This is a simple example of using Unitree Robots for reinforcement learning, inc
    - Clone [https://github.com/leggedrobotics/rsl_rl](https://github.com/leggedrobotics/rsl_rl)
    - `cd rsl_rl && git checkout v1.0.2 && pip install -e .`
 
+5. Install unitree_rl_gym
+
+   - Navigate to the folder `unitree_rl_gym`
+   - `pip install -e .`
+
 ### Usage
 
 1. Train:
