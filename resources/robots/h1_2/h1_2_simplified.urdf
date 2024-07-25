@@ -166,9 +166,27 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.08 0.0 -0.04" rpy="1.5707963267948966192313216916398 0.0 0.0"/>
       <geometry>
-        <mesh filename="meshes/left_ankle_roll_link.STL"/>
+        <cylinder radius="0.005" length="0.076"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.17 0.0 -0.04" rpy="1.5707963267948966192313216916398 0.0 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.042"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.027 -0.038 -0.04" rpy="0.0 1.5707963267948966192313216916398 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.21"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.027 0.038 -0.04" rpy="0.0 1.5707963267948966192313216916398 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.21"/>
       </geometry>
     </collision>
   </link>
@@ -318,9 +336,27 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.08 0.0 -0.04" rpy="1.5707963267948966192313216916398 0.0 0.0"/>
       <geometry>
-        <mesh filename="meshes/right_ankle_roll_link.STL"/>
+        <cylinder radius="0.005" length="0.076"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.17 0.0 -0.04" rpy="1.5707963267948966192313216916398 0.0 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.042"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.027 -0.038 -0.04" rpy="0.0 1.5707963267948966192313216916398 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.21"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.027 0.038 -0.04" rpy="0.0 1.5707963267948966192313216916398 0.0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.21"/>
       </geometry>
     </collision>
   </link>
