@@ -69,7 +69,7 @@ class H1RoughCfg( LeggedRobotCfg ):
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
         base_height_target = 0.98
-        class scales( LeggedRobotCfg.rewards.scales ):
+        class scales( LeggedRobotCfg.rewards.scales):
             tracking_lin_vel = 1.0
             tracking_ang_vel = 0.5
             lin_vel_z = -2.0
