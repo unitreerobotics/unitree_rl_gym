@@ -1,5 +1,5 @@
 <mujoco model="h1 scene">
-  <include file="h1_5.xml"/>
+  <include file="h1_2_12dof.xml"/>
 
   <statistic center="1.0 0.7 1.5" extent="0.8"/>
 

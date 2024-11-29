@@ -89,14 +89,14 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <!-- [CAUTION] use cylinder for hip_yaw_link -->
-    <collision>
+    <!-- <collision>
       <origin
         xyz="-0.067 0 0"
         rpy="0 1.57075 0" />
       <geometry>
         <cylinder length="0.07" radius="0.06" />
       </geometry>
-    </collision>
+    </collision> -->
   </link>
   <joint
     name="left_hip_yaw_joint"
@@ -299,12 +299,12 @@ Stephen Brawner (brawner@gmail.com)
       <mass
         value="0.552448" />
       <inertia
-        ixx="0.000156"
+        ixx="0.01"
         ixy="0"
         ixz="0.000143"
-        iyy="0.003620"
+        iyy="0.01"
         iyz="0"
-        izz="0.003551" />
+        izz="0.01" />
     </inertial>
     <visual>
       <origin
@@ -379,14 +379,14 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <!-- [CAUTION] use cylinder for hip_yaw_link -->
-    <collision>
+    <!-- <collision>
       <origin
         xyz="-0.067 0 0"
         rpy="0 1.57075 0" />
       <geometry>
         <cylinder length="0.07" radius="0.06" />
       </geometry>
-    </collision>
+    </collision> -->
   </link>
   <joint
     name="right_hip_yaw_joint"
@@ -589,12 +589,12 @@ Stephen Brawner (brawner@gmail.com)
       <mass
         value="0.552448" />
       <inertia
-        ixx="0.000156"
+        ixx="0.01"
         ixy="0"
         ixz="0.000143"
-        iyy="0.003620"
+        iyy="0.01"
         iyz="0"
-        izz="0.003551" />
+        izz="0.01" />
     </inertial>
     <visual>
       <origin
