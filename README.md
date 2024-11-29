@@ -59,12 +59,57 @@ https://github.com/user-attachments/assets/98395d82-d3f6-4548-b6ee-8edfce70ac3e
 
 2. H1
 
-https://github.com/user-attachments/assets/a9475a63-ea06-4327-bfa6-6a0f8065fa1c
+https://github.com/user-attachments/assets/7762b4f9-1072-4794-8ef6-7dd253a7ad4c
 
 3. H1-2
 
-https://github.com/user-attachments/assets/d6cdee70-8f8a-4a50-b219-df31b269b083
+https://github.com/user-attachments/assets/695323a7-a2d9-445b-bda8-f1b697159c39
 
 4. G1
 
-https://github.com/user-attachments/assets/0b554137-76bc-43f9-97e1-dd704a33d6a9
+https://github.com/user-attachments/assets/6063c03e-1143-4c75-8fda-793c8615cb08
+
+
+### mujoco(sim2sim)
+
+1. H1
+
+Execute the following command in the project path:
+
+```bash
+
+python deploy/deploy_mujoco/deploy_mujoco.py g1.yaml
+
+```
+
+Then you can get the following effect:
+
+https://github.com/user-attachments/assets/10a84f8d-c02f-41cb-b2fd-76a97951b2c3
+
+2. H1_2
+
+Execute the following command in the project path:
+
+```bash
+
+python deploy/deploy_mujoco/deploy_mujoco.py h1_2.yaml
+
+```
+
+Then you can get the following effect:
+
+https://github.com/user-attachments/assets/fdd4f53d-3235-4978-a77f-1c71b32fb301
+
+3. G1
+
+Execute the following command in the project path:
+
+```bash
+
+python deploy/deploy_mujoco/deploy_mujoco.py g1.yaml
+
+```
+
+Then you can get the following effect:
+
+https://github.com/user-attachments/assets/99b892c3-7886-49f4-a7f1-0420b51443dd
