@@ -4,7 +4,7 @@ This code can deploy the trained network on physical robots. Currently supported
 
 | G1 | H1 | H1_2 |
 |--- | --- | --- |
-| ![G1](https://oss-global-cdn.unitree.com/static/d33febc2e63d463091b6defb46c15123.GIF) | ![H1](https://oss-global-cdn.unitree.com/static/a84afcef56914e8aa3f0fc4e5c840772.GIF) | ![H1_2](https://oss-global-cdn.unitree.com/static/df0bdb852e294bd6beedf3d0adbb736f.GIF) |
+| [![real_g1](https://oss-global-cdn.unitree.com/static/78c61459d3ab41448cfdb31f6a537e8b.GIF)](https://oss-global-cdn.unitree.com/static/0818dcf7a6874b92997354d628adcacd.mp4) | [![real_h1](https://oss-global-cdn.unitree.com/static/fa07b2fd2ad64bb08e6b624d39336245.GIF)](https://oss-global-cdn.unitree.com/static/ea0084038d384e3eaa73b961f33e6210.mp4) | [![real_h1_2](https://oss-global-cdn.unitree.com/static/a88915e3523546128a79520aa3e20979.GIF)](https://oss-global-cdn.unitree.com/static/12d041a7906e489fae79d55b091a63dd.mp4) |
 
 
 ## Startup Usage
@@ -74,6 +74,10 @@ In motion control mode, press the `select` button on the remote control, the rob
 
 ## Video tutorial
 
-| G1 | H1 | H1_2 |
-|--- | --- | --- |
-| [<img src="https://oss-global-cdn.unitree.com/static/c5667475f51844628911cf032509d80a_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/621806fb837c4f869e5c59efd1d93105.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/42d2332dc3004097896f33d0db027039_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/9c61509fc4f74d21bb707a5fe3ae11aa.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/c49a03fa297a4d178ec3a5b01b9c0bbf_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/e60a0fcd829e417f92a88e78463a695d.mp4) |
+
+deploy on G1 robot: [https://oss-global-cdn.unitree.com/static/ea12b7fb3bb641b3ada9c91d44d348db.mp4](https://oss-global-cdn.unitree.com/static/ea12b7fb3bb641b3ada9c91d44d348db.mp4)
+
+deploy on H1 robot: [https://oss-global-cdn.unitree.com/static/d4e0cdd8ce0d477fb5bffbb1ac5ef69d.mp4](https://oss-global-cdn.unitree.com/static/d4e0cdd8ce0d477fb5bffbb1ac5ef69d.mp4)
+
+deploy on H1_2 robot: [https://oss-global-cdn.unitree.com/static/8120e35452404923b854d9e98bdac951.mp4](https://oss-global-cdn.unitree.com/static/8120e35452404923b854d9e98bdac951.mp4)
+

@@ -4,7 +4,7 @@
 
 | G1 | H1 | H1_2 |
 |--- | --- | --- |
-| ![G1](https://oss-global-cdn.unitree.com/static/d33febc2e63d463091b6defb46c15123.GIF) | ![H1](https://oss-global-cdn.unitree.com/static/a84afcef56914e8aa3f0fc4e5c840772.GIF) | ![H1_2](https://oss-global-cdn.unitree.com/static/df0bdb852e294bd6beedf3d0adbb736f.GIF) |
+| [![real_g1](https://oss-global-cdn.unitree.com/static/78c61459d3ab41448cfdb31f6a537e8b.GIF)](https://oss-global-cdn.unitree.com/static/0818dcf7a6874b92997354d628adcacd.mp4) | [![real_h1](https://oss-global-cdn.unitree.com/static/fa07b2fd2ad64bb08e6b624d39336245.GIF)](https://oss-global-cdn.unitree.com/static/ea0084038d384e3eaa73b961f33e6210.mp4) | [![real_h1_2](https://oss-global-cdn.unitree.com/static/a88915e3523546128a79520aa3e20979.GIF)](https://oss-global-cdn.unitree.com/static/12d041a7906e489fae79d55b091a63dd.mp4) |
 
 ## 启动用法
 
@@ -72,6 +72,8 @@ python deploy_real.py enp3s0 g1.yaml
 
 ## 视频教程
 
-| G1 | H1 | H1_2 |
-|--- | --- | --- |
-| [<img src="https://oss-global-cdn.unitree.com/static/8e7132fc3062493db93e4eb5005908f4_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/e6c659515ccd437294709e5abb6ae8d8.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/41803de7a8384fa799509ddedb505db4_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/56a0160154d1468f9ed9628e4a43254e.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/76109eb66b7a4d46a347019b1053c4c7_1920x1080.png" width="400px">](https://oss-global-cdn.unitree.com/static/f34ab7b6a7b14e058bbaebfce712db3a.mp4) |
+部署在G1上：[https://oss-global-cdn.unitree.com/static/ff70a257ddf34adbb67733d8a90b24d4.mp4](https://oss-global-cdn.unitree.com/static/ff70a257ddf34adbb67733d8a90b24d4.mp4)
+
+部署在H1上：[https://oss-global-cdn.unitree.com/static/6dae1756f4214409a5ced7386ca011ae.mp4](https://oss-global-cdn.unitree.com/static/6dae1756f4214409a5ced7386ca011ae.mp4)
+
+部署在H1_2上：[https://oss-global-cdn.unitree.com/static/9d61a1470d3e4b9a9af6d131324fcb94.mp4](https://oss-global-cdn.unitree.com/static/9d61a1470d3e4b9a9af6d131324fcb94.mp4)
