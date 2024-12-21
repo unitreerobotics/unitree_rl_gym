@@ -31,7 +31,7 @@ This is a simple example of using Unitree Robots for reinforcement learning, inc
    - Navigate to the folder `unitree_rl_gym`
    - `pip install -e .`
 
-6. Install unitree_sdk2py (Optional for depoly on real robot)
+6. Install unitree_sdk2py (Optional for deploy on real robot)
 
    - Clone [https://github.com/unitreerobotics/unitree_sdk2_python](https://github.com/unitreerobotics/unitree_sdk2_python)
    - `cd unitree_sdk2_python & pip install -e .`
@@ -90,6 +90,6 @@ python deploy/deploy_mujoco/deploy_mujoco.py g1.yaml
 |--- | --- | --- |
 | [![mujoco_g1](https://oss-global-cdn.unitree.com/static/244cd5c4f823495fbfb67ef08f56aa33.GIF)](https://oss-global-cdn.unitree.com/static/5aa48535ffd641e2932c0ba45c8e7854.mp4)  |  [![mujoco_h1](https://oss-global-cdn.unitree.com/static/7ab4e8392e794e01b975efa205ef491e.GIF)](https://oss-global-cdn.unitree.com/static/8934052becd84d08bc8c18c95849cf32.mp4)  |  [![mujoco_h1_2](https://oss-global-cdn.unitree.com/static/2905e2fe9b3340159d749d5e0bc95cc4.GIF)](https://oss-global-cdn.unitree.com/static/ee7ee85bd6d249989a905c55c7a9d305.mp4) |
 
-## 4. Depoly on Physical Robot
+## 4. Deploy on Physical Robot
 
 reference to [Deploy on Physical Robot(English)](deploy/deploy_real/README.md) | [实物部署（简体中文）](deploy/deploy_real/README.zh.md)
