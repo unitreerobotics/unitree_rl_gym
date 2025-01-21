@@ -5,7 +5,7 @@
 This package includes a streamlined robot description (URDF & MJCF) for the [Unitree H1](https://www.unitree.com/h1/), developed by [Unitree Robotics](https://www.unitree.com/).
 
 <p align="center">
-  <img src="h1_5.png" width="500"/>
+  <img src="h1_2.png" width="500"/>
 </p>
 
 Unitree H1 have 51 DOFs:
