@@ -1,6 +1,11 @@
 <mujoco model="g1_29dof_rev_1_0">
   <compiler angle="radian" meshdir="meshes"/>
 
+  <statistic meansize="0.144785" extent="1.23314" center="0.025392 2.0634e-05 -0.245975"/>
+  <default>
+    <joint damping="0.001" armature="0.01" frictionloss="0.1"/>
+  </default>
+  
   <asset>
     <mesh name="pelvis" file="pelvis.STL"/>
     <mesh name="pelvis_contour_link" file="pelvis_contour_link.STL"/>

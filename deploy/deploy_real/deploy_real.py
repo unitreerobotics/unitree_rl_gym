@@ -19,6 +19,79 @@ from common.rotation_helper import get_gravity_orientation, transform_imu_data
 from common.remote_controller import RemoteController, KeyMap
 from config import Config
 
+isaaclab_joint_order = [
+    'left_hip_pitch_joint',
+    'right_hip_pitch_joint',
+    'waist_yaw_joint',
+    'left_hip_roll_joint',
+    'right_hip_roll_joint',
+    'waist_roll_joint',
+    'left_hip_yaw_joint',
+    'right_hip_yaw_joint',
+    'waist_pitch_joint',
+    'left_knee_joint',
+    'right_knee_joint',
+    'left_shoulder_pitch_joint',
+    'right_shoulder_pitch_joint',
+    'left_ankle_pitch_joint',
+    'right_ankle_pitch_joint',
+    'left_shoulder_roll_joint',
+    'right_shoulder_roll_joint',
+    'left_ankle_roll_joint',
+    'right_ankle_roll_joint',
+    'left_shoulder_yaw_joint',
+    'right_shoulder_yaw_joint',
+    'left_elbow_joint',
+    'right_elbow_joint',
+    'left_wrist_roll_joint',
+    'right_wrist_roll_joint',
+    'left_wrist_pitch_joint',
+    'right_wrist_pitch_joint',
+    'left_wrist_yaw_joint',
+    'right_wrist_yaw_joint'
+]
+
+raw_joint_order = [
+    'left_hip_pitch_joint',
+    'left_hip_roll_joint',
+    'left_hip_yaw_joint',
+    'left_knee_joint',
+    'left_ankle_pitch_joint',
+    'left_ankle_roll_joint',
+    'right_hip_pitch_joint',
+    'right_hip_roll_joint',
+    'right_hip_yaw_joint',
+    'right_knee_joint',
+    'right_ankle_pitch_joint',
+    'right_ankle_roll_joint',
+    'waist_yaw_joint',
+    'waist_roll_joint',
+    'waist_pitch_joint',
+    'left_shoulder_pitch_joint',
+    'left_shoulder_roll_joint',
+    'left_shoulder_yaw_joint',
+    'left_elbow_joint',
+    'left_wrist_roll_joint',
+    'left_wrist_pitch_joint',
+    'left_wrist_yaw_joint',
+    'right_shoulder_pitch_joint',
+    'right_shoulder_roll_joint',
+    'right_shoulder_yaw_joint',
+    'right_elbow_joint',
+    'right_wrist_roll_joint',
+    'right_wrist_pitch_joint',
+    'right_wrist_yaw_joint'
+]
+
+# Create a mapping tensor
+# mapping_tensor = torch.zeros((len(sim_b_joints), len(sim_a_joints)), device=env.device)
+mapping_tensor = torch.zeros((len(raw_joint_order), len(isaaclab_joint_order)))
+
+# Fill the mapping tensor
+for b_idx, b_joint in enumerate(raw_joint_order):
+    if b_joint in isaaclab_joint_order:
+        a_idx = isaaclab_joint_order.index(b_joint)
+        mapping_tensor[a_idx, b_idx] = 1.0
 
 class Controller:
     def __init__(self, config: Config) -> None:
@@ -104,10 +177,14 @@ class Controller:
         total_time = 2
         num_step = int(total_time / self.config.control_dt)
         
-        dof_idx = self.config.leg_joint2motor_idx + self.config.arm_waist_joint2motor_idx
-        kps = self.config.kps + self.config.arm_waist_kps
-        kds = self.config.kds + self.config.arm_waist_kds
-        default_pos = np.concatenate((self.config.default_angles, self.config.arm_waist_target), axis=0)
+        # dof_idx = self.config.leg_joint2motor_idx + self.config.arm_waist_joint2motor_idx
+        # kps = self.config.kps + self.config.arm_waist_kps
+        # kds = self.config.kds + self.config.arm_waist_kds
+        # default_pos = np.concatenate((self.config.default_angles, self.config.arm_waist_target), axis=0)
+        dof_idx = self.config.joint2motor_idx
+        kps = self.config.kps
+        kds = self.config.kds
+        default_pos = self.config.default_angles
         dof_size = len(dof_idx)
         
         # record the current pos
@@ -133,19 +210,26 @@ class Controller:
         print("Enter default pos state.")
         print("Waiting for the Button A signal...")
         while self.remote_controller.button[KeyMap.A] != 1:
-            for i in range(len(self.config.leg_joint2motor_idx)):
-                motor_idx = self.config.leg_joint2motor_idx[i]
+            # for i in range(len(self.config.leg_joint2motor_idx)):
+            #     motor_idx = self.config.leg_joint2motor_idx[i]
+            #     self.low_cmd.motor_cmd[motor_idx].q = self.config.default_angles[i]
+            #     self.low_cmd.motor_cmd[motor_idx].qd = 0
+            #     self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
+            #     self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
+            #     self.low_cmd.motor_cmd[motor_idx].tau = 0
+            # for i in range(len(self.config.arm_waist_joint2motor_idx)):
+            #     motor_idx = self.config.arm_waist_joint2motor_idx[i]
+            #     self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
+            #     self.low_cmd.motor_cmd[motor_idx].qd = 0
+            #     self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
+            #     self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
+            #     self.low_cmd.motor_cmd[motor_idx].tau = 0
+            for i in range(len(self.config.joint2motor_idx)):
+                motor_idx = self.config.joint2motor_idx[i]
                 self.low_cmd.motor_cmd[motor_idx].q = self.config.default_angles[i]
                 self.low_cmd.motor_cmd[motor_idx].qd = 0
                 self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
                 self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
-                self.low_cmd.motor_cmd[motor_idx].tau = 0
-            for i in range(len(self.config.arm_waist_joint2motor_idx)):
-                motor_idx = self.config.arm_waist_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
-                self.low_cmd.motor_cmd[motor_idx].qd = 0
-                self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
-                self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
                 self.low_cmd.motor_cmd[motor_idx].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.config.control_dt)
@@ -153,9 +237,13 @@ class Controller:
     def run(self):
         self.counter += 1
         # Get the current joint position and velocity
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            self.qj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].q
-            self.dqj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].dq
+        # for i in range(len(self.config.leg_joint2motor_idx)):
+        #     self.qj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].q
+        #     self.dqj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].dq
+        for i, motor_idx in enumerate(self.config.joint2motor_idx):
+            self.qj[i] = self.low_state.motor_state[motor_idx].q
+            self.dqj[i] = self.low_state.motor_state[motor_idx].dq
+
 
         # imu_state quaternion: w, x, y, z
         quat = self.low_state.imu_state.quaternion
@@ -164,8 +252,11 @@ class Controller:
         if self.config.imu_type == "torso":
             # h1 and h1_2 imu is on the torso
             # imu data needs to be transformed to the pelvis frame
-            waist_yaw = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
-            waist_yaw_omega = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
+            # waist_yaw = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
+            # waist_yaw_omega = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
+            waist_yaw = self.low_state.motor_state[self.config.joint2motor_idx[12]].q
+            waist_yaw_omega = self.low_state.motor_state[self.config.joint2motor_idx[12]].dq
+
             quat, ang_vel = transform_imu_data(waist_yaw=waist_yaw, waist_yaw_omega=waist_yaw_omega, imu_quat=quat, imu_omega=ang_vel)
 
         # create observation
@@ -175,11 +266,11 @@ class Controller:
         qj_obs = (qj_obs - self.config.default_angles) * self.config.dof_pos_scale
         dqj_obs = dqj_obs * self.config.dof_vel_scale
         ang_vel = ang_vel * self.config.ang_vel_scale
-        period = 0.8
-        count = self.counter * self.config.control_dt
-        phase = count % period / period
-        sin_phase = np.sin(2 * np.pi * phase)
-        cos_phase = np.cos(2 * np.pi * phase)
+        # period = 0.8
+        # count = self.counter * self.config.control_dt
+        # phase = count % period / period
+        # sin_phase = np.sin(2 * np.pi * phase)
+        # cos_phase = np.cos(2 * np.pi * phase)
 
         self.cmd[0] = self.remote_controller.ly
         self.cmd[1] = self.remote_controller.lx * -1
@@ -192,32 +283,48 @@ class Controller:
         self.obs[9 : 9 + num_actions] = qj_obs
         self.obs[9 + num_actions : 9 + num_actions * 2] = dqj_obs
         self.obs[9 + num_actions * 2 : 9 + num_actions * 3] = self.action
-        self.obs[9 + num_actions * 3] = sin_phase
-        self.obs[9 + num_actions * 3 + 1] = cos_phase
+        # self.obs[9 + num_actions * 3] = sin_phase
+        # self.obs[9 + num_actions * 3 + 1] = cos_phase
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
+
+        # Reorder the observations
+        obs_tensor[..., 9:38] = obs_tensor[..., 9:38] @ mapping_tensor.transpose(0, 1)
+        obs_tensor[..., 38:67] = obs_tensor[..., 38:67] @ mapping_tensor.transpose(0, 1)
+        obs_tensor[..., 67:96] = obs_tensor[..., 67:96] @ mapping_tensor.transpose(0, 1)
+
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
+
+        # Reorder the actions
+        self.action = self.action @ mapping_tensor.detach().cpu().numpy()
         
         # transform action to target_dof_pos
         target_dof_pos = self.config.default_angles + self.action * self.config.action_scale
 
         # Build low cmd
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            motor_idx = self.config.leg_joint2motor_idx[i]
+        # for i in range(len(self.config.leg_joint2motor_idx)):
+        #     motor_idx = self.config.leg_joint2motor_idx[i]
+        #     self.low_cmd.motor_cmd[motor_idx].q = target_dof_pos[i]
+        #     self.low_cmd.motor_cmd[motor_idx].qd = 0
+        #     self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
+        #     self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
+        #     self.low_cmd.motor_cmd[motor_idx].tau = 0
+
+        # for i in range(len(self.config.arm_waist_joint2motor_idx)):
+        #     motor_idx = self.config.arm_waist_joint2motor_idx[i]
+        #     self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
+        #     self.low_cmd.motor_cmd[motor_idx].qd = 0
+        #     self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
+        #     self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
+        #     self.low_cmd.motor_cmd[motor_idx].tau = 0
+        for i, motor_idx in enumerate(self.config.joint2motor_idx):
             self.low_cmd.motor_cmd[motor_idx].q = target_dof_pos[i]
             self.low_cmd.motor_cmd[motor_idx].qd = 0
             self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
             self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
             self.low_cmd.motor_cmd[motor_idx].tau = 0
 
-        for i in range(len(self.config.arm_waist_joint2motor_idx)):
-            motor_idx = self.config.arm_waist_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
-            self.low_cmd.motor_cmd[motor_idx].qd = 0
-            self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
-            self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
-            self.low_cmd.motor_cmd[motor_idx].tau = 0
 
         # send the command
         self.send_cmd(self.low_cmd)

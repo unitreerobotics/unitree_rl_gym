@@ -27,7 +27,7 @@ class G1Robot(LeggedRobot):
         noise_vec[9:9+self.num_actions] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
         noise_vec[9+self.num_actions:9+2*self.num_actions] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
         noise_vec[9+2*self.num_actions:9+3*self.num_actions] = 0. # previous actions
-        noise_vec[9+3*self.num_actions:9+3*self.num_actions+2] = 0. # sin/cos phase
+        # noise_vec[9+3*self.num_actions:9+3*self.num_actions+2] = 0. # sin/cos phase
         
         return noise_vec
 
@@ -68,26 +68,55 @@ class G1Robot(LeggedRobot):
     def compute_observations(self):
         """ Computes observations
         """
-        sin_phase = torch.sin(2 * np.pi * self.phase ).unsqueeze(1)
-        cos_phase = torch.cos(2 * np.pi * self.phase ).unsqueeze(1)
-        self.obs_buf = torch.cat((  self.base_ang_vel  * self.obs_scales.ang_vel,
+        # sin_phase = torch.sin(2 * np.pi * self.phase ).unsqueeze(1)
+        # cos_phase = torch.cos(2 * np.pi * self.phase ).unsqueeze(1)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.pelvis_states = self.rigid_body_states_view[:, 0, :]
+        from icecream import ic
+        # ic(self.pelvis_states)
+        # ic(self.commands[:, :3] * self.commands_scale)
+        self.pelvis_ang_vel = quat_rotate_inverse(self.pelvis_states[..., 3:7], self.pelvis_states[:, 10:13])
+        self.projected_gravity = quat_rotate_inverse(self.pelvis_states[..., 3:7], self.gravity_vec)
+        # self.commands[..., :3] = 0.
+
+        # if self.episode_length_buf == 0:
+        #     self.pelvis_ang_vel[..., :] = 0.
+        #     self.projected_gravity[..., 0:2] = 0.
+        #     self.projected_gravity[..., 2] = -1.
+        
+        self.obs_buf = torch.cat((  
+                                    # self.base_ang_vel  * self.obs_scales.ang_vel,
+                                    self.pelvis_ang_vel* self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions,
-                                    sin_phase,
-                                    cos_phase
+                                    # sin_phase,
+                                    # cos_phase
                                     ),dim=-1)
-        self.privileged_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
+        from icecream import ic
+        # ic(
+        #     self.episode_length_buf,
+        #     self.base_ang_vel,
+        #     self.projected_gravity,
+        #     self.commands,
+        #     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
+        #     self.dof_vel,
+        #     self.actions,
+
+
+        # )
+        self.privileged_obs_buf = torch.cat((  
+            # self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions,
-                                    sin_phase,
-                                    cos_phase
+                                    # sin_phase,
+                                    # cos_phase
                                     ),dim=-1)
         # add perceptive inputs if not blind
         # add noise if needed
