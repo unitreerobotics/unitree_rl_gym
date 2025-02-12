@@ -40,6 +40,11 @@ class Config:
                 self.arm_waist_kps = []
                 self.arm_waist_kds = []
                 self.arm_waist_target = []
+
+            if 'motor_joint' in config:
+                self.motor_joint = config['motor_joint']
+            else:
+                self.motor_joint=[]
                 
             self.ang_vel_scale = config["ang_vel_scale"]
             self.dof_pos_scale = config["dof_pos_scale"]
