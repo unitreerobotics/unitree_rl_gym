@@ -7,6 +7,9 @@ import torch
 import rclpy as rp
 from unitree_hg.msg import LowCmd as LowCmdHG, LowState as LowStateHG
 from unitree_go.msg import LowCmd as LowCmdGo, LowState as LowStateGo
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 from common.command_helper_ros import create_damping_cmd, create_zero_cmd, init_cmd_hg, init_cmd_go, MotorMode
 from common.rotation_helper import get_gravity_orientation, transform_imu_data
 from common.remote_controller import RemoteController, KeyMap
@@ -22,6 +25,65 @@ class Mode(Enum):
     damping = 3
     policy = 4
     null = 5
+
+def body_pose_axa(frame:str):
+    """ --> tf does not exist """
+    try:
+        t = tf_buffer.lookup_transform(
+            to_frame_rel,
+            from_frame_rel,
+            rclpy.time.Time())
+    except TransformException as ex:
+        print(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+        return (np.zeros(3), np.zeros(3))
+
+    txn = t.transform.translation
+    rxn = t.transform.rotation
+
+    xyz = [txn.x, txn.y, txn.z]
+    quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
+
+    xyz = np.array(xyz)
+    axa = axa_from_quat(quat_wxyz)
+
+    return (xyz, axa)
+
+def make_obs(config,
+             low_state,
+             quat,
+             last_action):
+    # observation terms (order preserved)
+
+    # NOTE(ycho): dummy value
+    base_lin_vel = np.zeros(3)
+    base_ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
+
+    # FIXME(ycho): check if the convention "q_base^{-1} @ g" holds.
+    projected_gravity = get_gravity_orientation(quat)
+
+    fp_l = body_pose_axa('left_ankle_roll_link')
+    fp_r = body_pose_axa('right_ankle_roll_link')
+    foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
+
+    hp_l = body_pose_axa('left_hand_palm_link')
+    hp_r = body_pose_axa('right_hand_palm_link')
+    hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
+
+    projected_com = _
+    projected_zmp = _ # IMPOSSIBLE
+
+    joint_pos = []
+    joint_vel = []
+    for i in range(len(config.leg_joint2motor_idx)):
+        joint_pos[i] = low_state.motor_state[config.leg_joint2motor_idx[i]].q
+        joint_vel[i] = low_state.motor_state[config.leg_joint2motor_idx[i]].dq
+    actions = last_action
+
+    hands_command = _ # goal
+    right_arm_com = _
+    left_arm_com = _
+    pelvis_height = _
+
 
 class Controller:
     def __init__(self, config: Config) -> None:
