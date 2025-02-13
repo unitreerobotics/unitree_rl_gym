@@ -258,6 +258,7 @@ class Controller:
                                self.lim_hi_pin[i_pin])
             self.low_cmd.motor_cmd[i_mot].q = target_q
             self.low_cmd.motor_cmd[i_mot].dq = 0.0
+            # FIXME(ycho): arbitrary scaling
             self.low_cmd.motor_cmd[i_mot].kp = 0.2*float(self.config.kps[i_mot])
             self.low_cmd.motor_cmd[i_mot].kd = 0.2*float(self.config.kds[i_mot])
             self.low_cmd.motor_cmd[i_mot].tau = 0.0
