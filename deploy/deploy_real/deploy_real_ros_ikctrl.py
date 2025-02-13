@@ -35,14 +35,14 @@ class Controller:
             "left_wrist_roll_joint",
             "left_wrist_pitch_joint",
             "left_wrist_yaw_joint"]
-        self.ikctrl = IKCtrl('/input/unitree_ros/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
+        self.ikctrl = IKCtrl('../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
                              act_joint)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
         self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
 
-        self.pin_from_mot = np.zeros(29) # FIXME(ycho): hardcoded
-        self.mot_from_pin = np.zeros(43) # FIXME(ycho): hardcoded
-        self.mot_from_pin_act = np.zeros(7) # FIXME(ycho): hardcoded
+        self.pin_from_mot = np.zeros(29, dtype=np.int32) # FIXME(ycho): hardcoded
+        self.mot_from_pin = np.zeros(43, dtype=np.int32) # FIXME(ycho): hardcoded
+        self.mot_from_pin_act = np.zeros(7, dtype=np.int32) # FIXME(ycho): hardcoded
         for i_mot, j in enumerate( self.config.motor_joint ):
             i_pin = (self.ikctrl.robot.index(j) - 1)
             self.pin_from_mot[i_mot] = i_pin
@@ -221,7 +221,7 @@ class Controller:
         self.counter += 1
 
         # Get current joint positions
-        for i_mot in range(len(self.motor_joint)):
+        for i_mot in range(len(self.config.motor_joint)):
             i_pin = self.pin_from_mot[i_mot]
             self.qj[i_pin] = self.low_state.motor_state[i_mot].q
         self.cmd[0] = self.remote_controller.ly

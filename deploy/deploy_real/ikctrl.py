@@ -64,8 +64,9 @@ class IKCtrl:
                  joint_names: Tuple[str, ...],
                  sqlmda: float = 0.05**2):
         path = Path(urdf_path)
+        print('urdf path', path.parent.resolve())
         with with_dir(path.parent):
-            robot = pin.RobotWrapper.BuildFromURDF(filename=urdf_path,
+            robot = pin.RobotWrapper.BuildFromURDF(filename=path.name,
                                                    package_dirs=["."],
                                                    root_joint=None)
             self.robot = robot
@@ -106,7 +107,11 @@ class IKCtrl:
         dst_quat = pin.Quaternion(wxyz2xyzw(target_pose[..., 3:7]))
         T1 = pin.SE3(dst_quat, dst_xyz)
         if rel:
-            T1 = T0 @ T1
+            TL = pin.SE3.Identity()
+            TL.translation = dst_xyz
+            TR = pin.SE3.Identity()
+            TR.rotation = dst_quat.toRotationMatrix()
+            T1 = TL * T0 * TR
 
         # jacobian
         self.task.set_target(T0)

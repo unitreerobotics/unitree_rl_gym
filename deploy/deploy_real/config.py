@@ -22,7 +22,8 @@ class Config:
 
             self.policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
 
-            self.leg_joint2motor_idx = config["leg_joint2motor_idx"]
+            if 'leg_joint2motor_idx' in config:
+                self.leg_joint2motor_idx = config["leg_joint2motor_idx"]
             if 'joint2motor_idx' in config:
                 self.joint2motor_idx = config["joint2motor_idx"]
             
