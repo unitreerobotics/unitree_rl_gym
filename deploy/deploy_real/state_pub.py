@@ -41,6 +41,9 @@ class StatePublisher(Node):
         joint_state.header.stamp = now.to_msg()
         joint_state.name = self.joint_names
         joint_state.position = [0.0 for _ in self.joint_names]
+
+        print('a', len(self.joint_names)) 
+        print('b', len(self.low_state.motor_state))
         for i in range(len(self.low_state.motor_state)):
             joint_state.position[i] = self.low_state.motor_state[i].q
         self.joint_pub.publish(joint_state)
