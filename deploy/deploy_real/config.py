@@ -46,6 +46,11 @@ class Config:
                 self.motor_joint = config['motor_joint']
             else:
                 self.motor_joint=[]
+
+            if 'act_joint' in config:
+                self.act_joint = config['act_joint']
+            else:
+                self.act_joint=[]
                 
             self.ang_vel_scale = config["ang_vel_scale"]
             self.dof_pos_scale = config["dof_pos_scale"]

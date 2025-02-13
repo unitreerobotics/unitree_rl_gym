@@ -14,7 +14,8 @@ from config import Config
 from common.crc import CRC
 
 from enum import Enum
-from ikctrl import IKCtrl
+import pinocchio as pin
+from ikctrl import IKCtrl, xyzw2wxyz
 
 class Mode(Enum):
     wait = 0
@@ -28,29 +29,35 @@ class Controller:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.remote_controller = RemoteController()
-        act_joint = ["left_shoulder_pitch_joint",
-            "left_shoulder_roll_joint",
-            "left_shoulder_yaw_joint",
-            "left_elbow_joint",
-            "left_wrist_roll_joint",
-            "left_wrist_pitch_joint",
-            "left_wrist_yaw_joint"]
+
+        act_joint = config.act_joint
         self.ikctrl = IKCtrl('../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
                              act_joint)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
         self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
 
+        # == build index map ==
         self.pin_from_mot = np.zeros(29, dtype=np.int32) # FIXME(ycho): hardcoded
         self.mot_from_pin = np.zeros(43, dtype=np.int32) # FIXME(ycho): hardcoded
-        self.mot_from_pin_act = np.zeros(7, dtype=np.int32) # FIXME(ycho): hardcoded
+        self.mot_from_act = np.zeros(7, dtype=np.int32) # FIXME(ycho): hardcoded
         for i_mot, j in enumerate( self.config.motor_joint ):
             i_pin = (self.ikctrl.robot.index(j) - 1)
             self.pin_from_mot[i_mot] = i_pin
             self.mot_from_pin[i_pin] = i_mot
             if j in act_joint:
                 i_act = act_joint.index(j)
-                self.mot_from_pin_act[i_act] = i_mot
+                self.mot_from_act[i_act] = i_mot
 
+        q_mot = np.array(config.default_angles)
+        q_pin = np.zeros_like(self.ikctrl.cfg.q)
+        q_pin[self.pin_from_mot] = q_mot
+
+        if True:
+            default_pose = self.ikctrl.fk(q_pin)
+            xyz = default_pose.translation
+            quat_wxyz = xyzw2wxyz(pin.Quaternion(default_pose.rotation).coeffs())
+            self.default_pose = np.concatenate([xyz, quat_wxyz])
+            self.target_pose = np.copy(self.default_pose)
 
         # Initialize the policy network
         self.policy = torch.jit.load(config.policy_path)
@@ -224,14 +231,24 @@ class Controller:
         for i_mot in range(len(self.config.motor_joint)):
             i_pin = self.pin_from_mot[i_mot]
             self.qj[i_pin] = self.low_state.motor_state[i_mot].q
+
         self.cmd[0] = self.remote_controller.ly
         self.cmd[1] = self.remote_controller.lx * -1
         self.cmd[2] = self.remote_controller.rx * -1
-        delta = np.concatenate([self.cmd,
-                                [1,0,0,0]])
-        res_q = self.ikctrl(self.qj, delta, rel=True)
+
+        if False:
+            delta = np.concatenate([self.cmd,
+                                    [1,0,0,0]])
+            res_q = self.ikctrl(self.qj, delta, rel=True)
+        else:
+            # FIXME(ycho): 0.01 --> cmd_scale ?
+            self.target_pose[..., :3] += 0.01 * self.cmd
+            res_q = self.ikctrl(self.qj,
+                                self.target_pose,
+                                rel=False)
+
         for i_act in range(len(res_q)):
-            i_mot = self.mot_from_pin_act[i_act]
+            i_mot = self.mot_from_act[i_act]
             i_pin = self.pin_from_mot[i_mot]
             target_q = (
                     self.low_state.motor_state[i_mot].q + res_q[i_act]
