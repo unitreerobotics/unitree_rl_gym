@@ -242,7 +242,7 @@ class Controller:
             res_q = self.ikctrl(self.qj, delta, rel=True)
         else:
             # FIXME(ycho): 0.01 --> cmd_scale ?
-            self.target_pose[..., :3] += 0.001 * self.cmd
+            self.target_pose[..., :3] += 0.01 * self.cmd
             res_q = self.ikctrl(self.qj,
                                 self.target_pose,
                                 rel=False)
@@ -258,8 +258,8 @@ class Controller:
                                self.lim_hi_pin[i_pin])
             self.low_cmd.motor_cmd[i_mot].q = target_q
             self.low_cmd.motor_cmd[i_mot].dq = 0.0
-            self.low_cmd.motor_cmd[i_mot].kp = 0.01*float(self.config.kps[i_mot])
-            self.low_cmd.motor_cmd[i_mot].kd = 0.01*float(self.config.kps[i_mot])
+            self.low_cmd.motor_cmd[i_mot].kp = 0.2*float(self.config.kps[i_mot])
+            self.low_cmd.motor_cmd[i_mot].kd = 0.2*float(self.config.kds[i_mot])
             self.low_cmd.motor_cmd[i_mot].tau = 0.0
         # send the command
         self.send_cmd(self.low_cmd)
