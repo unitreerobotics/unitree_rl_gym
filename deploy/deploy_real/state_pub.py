@@ -11,13 +11,11 @@ import yaml
 class StatePublisher(Node):
 
     def __init__(self):
-        rclpy.init()
         super().__init__('state_publisher')
         qos_profile = QoSProfile(depth=10)
 
         with open('./configs/ik.yaml', 'r') as fp:
             self.joint_names = yaml.safe_load(fp)['motor_joint']
-
 
         self.low_state = LowStateHG()
         self.low_state_subscriber = self.create_subscription(LowStateHG,
@@ -62,8 +60,11 @@ class StatePublisher(Node):
 
 
 def main():
+    rclpy.init()
     node = StatePublisher()
-    node.run()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
