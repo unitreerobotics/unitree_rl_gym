@@ -7,7 +7,7 @@ import time
 import yaml
 import numpy as np
 import torch as th
-from yourdfpy import URDF
+# from yourdfpy import URDF
 
 import pinocchio as pin
 import pink
