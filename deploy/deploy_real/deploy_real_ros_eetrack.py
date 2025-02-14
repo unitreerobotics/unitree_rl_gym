@@ -25,15 +25,22 @@ class Mode(Enum):
     policy = 4
     null = 5
         
-def body_pose_axa(frame:str):
+def body_pose_axa(
+        tf_buffer,
+        frame:str,
+        ref_frame:str='pelvis',
+        stamp=None):
     """ --> tf does not exist """
+    if stamp is None:
+        stamp = rclpy.time.Time()
     try:
+        # t = "ref{=pelvis}_from_frame" transform
         t = tf_buffer.lookup_transform(
-            to_frame_rel,
-            from_frame_rel,
-            rclpy.time.Time())
+            ref_frame, #to
+            frame, #from
+            stamp)
     except TransformException as ex:
-        print(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+        print(f'Could not transform {frame} to {ref_frame}: {ex}')
         return (np.zeros(3), np.zeros(3))
 
     txn = t.transform.translation
@@ -57,6 +64,9 @@ class Observation:
                  low_state: LowStateHG,
                  last_action: np.ndarray
                  ):
+        lab_from_mot = self.lab_from_mot
+        # 15+0(??)+7
+        num_lab_actions = 22
         # observation terms (order preserved)
 
         # NOTE(ycho): dummy value
@@ -68,12 +78,12 @@ class Observation:
         quat = low_state.imu_state.quaternion
         projected_gravity = get_gravity_orientation(quat)
 
-        fp_l = body_pose_axa('left_ankle_roll_link')
-        fp_r = body_pose_axa('right_ankle_roll_link')
+        fp_l = body_pose_axa(self.tf_buffer,'left_ankle_roll_link')
+        fp_r = body_pose_axa(self.tf_buffer,'right_ankle_roll_link')
         foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
 
-        hp_l = body_pose_axa('left_hand_palm_link')
-        hp_r = body_pose_axa('right_hand_palm_link')
+        hp_l = body_pose_axa(self.tf_buffer,'left_hand_palm_link')
+        hp_r = body_pose_axa(self.tf_buffer,'right_hand_palm_link')
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
         projected_com = _
