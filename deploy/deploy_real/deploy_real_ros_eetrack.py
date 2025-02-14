@@ -120,7 +120,9 @@ class Observation:
         hp_r = body_pose_axa(self.tf_buffer,'right_hand_palm_link')
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
-        projected_com = _
+        projected_com = quat_rotate(
+            quat_conjugate(quat), (com_pos - root_pos)
+        )
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
