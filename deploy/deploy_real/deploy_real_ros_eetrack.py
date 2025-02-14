@@ -15,7 +15,6 @@ from common.rotation_helper import get_gravity_orientation, transform_imu_data
 from common.remote_controller import RemoteController, KeyMap
 from config import Config
 from common.crc import CRC
-
 from enum import Enum
 
 class Mode(Enum):
@@ -25,7 +24,7 @@ class Mode(Enum):
     damping = 3
     policy = 4
     null = 5
-
+        
 def body_pose_axa(frame:str):
     """ --> tf does not exist """
     try:
@@ -48,41 +47,54 @@ def body_pose_axa(frame:str):
 
     return (xyz, axa)
 
-def make_obs(config,
-             low_state,
-             quat,
-             last_action):
-    # observation terms (order preserved)
 
-    # NOTE(ycho): dummy value
-    base_lin_vel = np.zeros(3)
-    base_ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
+class Observation:
+    def __init__(self, tf_buffer:Buffer):
+        self.tf_buffer = tf_buffer
 
-    # FIXME(ycho): check if the convention "q_base^{-1} @ g" holds.
-    projected_gravity = get_gravity_orientation(quat)
+    
+    def __call__(self,
+                 low_state: LowStateHG,
+                 last_action: np.ndarray
+                 ):
+        # observation terms (order preserved)
 
-    fp_l = body_pose_axa('left_ankle_roll_link')
-    fp_r = body_pose_axa('right_ankle_roll_link')
-    foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
+        # NOTE(ycho): dummy value
+        # base_lin_vel = np.zeros(3)
+        base_ang_vel = np.array([low_state.imu_state.gyroscope],
+                                dtype=np.float32)
 
-    hp_l = body_pose_axa('left_hand_palm_link')
-    hp_r = body_pose_axa('right_hand_palm_link')
-    hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
+        # FIXME(ycho): check if the convention "q_base^{-1} @ g" holds.
+        quat = low_state.imu_state.quaternion
+        projected_gravity = get_gravity_orientation(quat)
 
-    projected_com = _
-    projected_zmp = _ # IMPOSSIBLE
+        fp_l = body_pose_axa('left_ankle_roll_link')
+        fp_r = body_pose_axa('right_ankle_roll_link')
+        foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
 
-    joint_pos = []
-    joint_vel = []
-    for i in range(len(config.leg_joint2motor_idx)):
-        joint_pos[i] = low_state.motor_state[config.leg_joint2motor_idx[i]].q
-        joint_vel[i] = low_state.motor_state[config.leg_joint2motor_idx[i]].dq
-    actions = last_action
+        hp_l = body_pose_axa('left_hand_palm_link')
+        hp_r = body_pose_axa('right_hand_palm_link')
+        hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
-    hands_command = _ # goal
-    right_arm_com = _
-    left_arm_com = _
-    pelvis_height = _
+        projected_com = _
+        # projected_zmp = _ # IMPOSSIBLE
+
+        # Map `low_state` to index-mapped joint_{pos,vel}
+        joint_pos = np.zeros(num_lab_actions,
+                            dtype=np.float32)
+        joint_vel = np.zeros(num_lab_actions,
+                            dtype=np.float32)
+        joint_pos[lab_from_mot] = [low_state.motor_state[i_mot].q for i_mot in
+                                range(len(lab_from_mot))]
+        joint_vel[lab_from_mot] = [low_state.motor_state[i_mot].dq for i_mot in
+                                range(len(lab_from_mot))]
+        actions = last_action
+
+        hands_command = _ # goal
+        right_arm_com = _
+        left_arm_com = _
+        pelvis_height = _
+
 
 
 class Controller:
