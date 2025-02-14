@@ -1,5 +1,5 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR
-from typing import Union
+from typing import Union, List
 import numpy as np
 import time
 import torch
@@ -55,16 +55,16 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     # However, as theta --> 0, we can use the Taylor approximation 1/2 -
     # theta^2 / 48
     quat = quat * (1.0 - 2.0 * (quat[..., 0:1] < 0.0))
-    mag = np.linalg.norm(quat[..., 1:], dim=-1)
+    mag = np.linalg.norm(quat[..., 1:], axis=-1)
     half_angle = np.arctan2(mag, quat[..., 0])
     angle = 2.0 * half_angle
     # check whether to apply Taylor approximation
     sin_half_angles_over_angles = np.where(
-        angle.abs() > eps,
+        np.abs(angle) > eps,
         np.sin(half_angle) / angle,
         0.5 - angle * angle / 48
     )
-    return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
+    return quat[..., 1:4] / sin_half_angles_over_angles[..., None]
 
 
 def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
@@ -79,9 +79,9 @@ def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     """
     q_w = q[..., 0]
     q_vec = q[..., 1:]
-    a = v * (2.0 * q_w**2 - 1.0).unsqueeze(-1)
-    b = np.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
-    c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
+    a = v * (2.0 * q_w**2 - 1.0)[..., None]
+    b = np.cross(q_vec, v, axis=-1) * q_w[..., None] * 2.0
+    c = q_vec * np.einsum("...i,...i->...", q_vec, v)[..., None] * 2.0
     return a + b + c
 
 
@@ -97,9 +97,9 @@ def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     """
     q_w = q[..., 0]
     q_vec = q[..., 1:]
-    a = v * (2.0 * q_w**2 - 1.0).unsqueeze(-1)
-    b = np.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
-    c = q_vec * np.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
+    a = v * (2.0 * q_w**2 - 1.0)[..., None]
+    b = np.cross(q_vec, v, axis=-1) * q_w[..., None] * 2.0
+    c = q_vec * np.einsum("...i,...i->...", q_vec, v)[..., None] * 2.0
     return a - b + c
 
 
@@ -125,8 +125,8 @@ def body_pose(
     txn = t.transform.translation
     rxn = t.transform.rotation
 
-    xyz = [txn.x, txn.y, txn.z]
-    quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
+    xyz = np.array([txn.x, txn.y, txn.z])
+    quat_wxyz = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
 
     xyz = np.array(xyz)
     if rot_type == 'axa':
@@ -141,20 +141,24 @@ def body_pose(
 from common.xml_helper import extract_link_data
 
 
-def compute_com(body_frames: list[str]):
+def compute_com(tf_buffer, body_frames: List[str]):
     """compute com of body frames"""
     mass_list = []
     com_list = []
 
     # bring default values
-    com_data = extract_link_data()
+    com_data = extract_link_data('../../resources/robots/g1_description/g1_29dof_rev_1_0.xml')
 
     # iterate for frames
     for frame in body_frames:
-        frame_data = com_data[frame]
+        try:
+            frame_data = com_data[frame]
+        except KeyError:
+            continue
 
         try:
-            link_pos, link_wxyz = body_pose(frame, rot_type='quat')
+            link_pos, link_wxyz = body_pose(tf_buffer,
+                    frame, rot_type='quat')
         except TransformException:
             continue
 
@@ -341,7 +345,7 @@ class Observation:
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
         # FIXME(ycho): implement com_pos_wrt_pelvis
-        projected_com = compute_com(self.links)
+        projected_com = compute_com(self.tf_buffer, self.links)
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
@@ -359,7 +363,7 @@ class Observation:
         # Given as delta_pos {xyz,axa}; i.e. 6D vector
         # hands_command = self.eetrack.get_command()
 
-        right_arm_com = compute_com([
+        right_arm_com = compute_com(self.tf_buffer, [
             "right_shoulder_pitch_link",
             "right_shoulder_roll_link",
             "right_shoulder_yaw_link",
@@ -368,7 +372,7 @@ class Observation:
             "right_wrist_roll_link",
             "right_wrist_yaw_link"
         ])
-        left_arm_com = compute_com([
+        left_arm_com = compute_com(self.tf_buffer, [
             "left_shoulder_pitch_link",
             "left_shoulder_roll_link",
             "left_shoulder_yaw_link",
@@ -381,12 +385,12 @@ class Observation:
             lf_from_pelvis = self.tf_buffer.lookup_transform(
                 'left_ankle_roll_link',  # to
                 'pelvis',
-                stamp=rp.time.Time()
+                rp.time.Time()
             )
             rf_from_pelvis = self.tf_buffer.lookup_transform(
                 'right_ankle_roll_link',  # to
                 'pelvis',
-                stamp=rp.time.Time()
+                rp.time.Time()
             )
             # NOTE(ycho): we assume at least one of the feet is on the ground
             #            and use the higher of the two as the pelvis height.
@@ -399,7 +403,7 @@ class Observation:
                 fp_l[0]
             )
             )
-        return np.concatenate([
+        obs = [
             base_ang_vel,
             projected_gravity,
             foot_pose,
@@ -412,7 +416,9 @@ class Observation:
             right_arm_com,
             left_arm_com,
             pelvis_height
-        ], axis=-1)
+        ]
+        print([np.shape(o) for o in obs])
+        return np.concatenate(obs, axis=-1)
 
 
 class Controller:
@@ -425,7 +431,7 @@ class Controller:
         self.action = np.zeros(config.num_actions, dtype=np.float32)
         self.ikctrl = IKCtrl(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
-            config.ik_joint)
+            config.arm_joint)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
         self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
 
@@ -442,6 +448,10 @@ class Controller:
             self.config.motor_joint,
             self.config.arm_joint
         )
+        self.mot_from_nonarm = index_map(
+            self.config.motor_joint,
+            self.config.non_arm_joint
+        )
 
         # Data buffers
         self.obs = np.zeros(config.num_obs, dtype=np.float32)
@@ -452,7 +462,7 @@ class Controller:
         rp.init()
         self._node = rp.create_node("low_level_cmd_sender")
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_listener = TransformListener(self.tf_buffer, self._node)
         self.obsmap = Observation(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
@@ -621,8 +631,8 @@ class Controller:
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
 
-        act_joint_pos = self.action[..., :15]
-        left_arm_residual = self.action[..., 15:22]
+        non_arm_joint_pos = self.action[..., :22]
+        left_arm_residual = self.action[..., 22:29]
 
         q_pin = np.zeros_like(self.ikctrl.cfg.q0)
         for i_mot in range(len(self.config.motor_joint)):

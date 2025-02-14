@@ -52,6 +52,11 @@ class Config:
             else:
                 self.arm_joint=[]
 
+            if 'non_arm_joint' in config:
+                self.non_arm_joint = config['non_arm_joint']
+            else:
+                self.non_arm_joint=[]
+
             if 'lab_joint' in config:
                 self.lab_joint = config['lab_joint']
             else:

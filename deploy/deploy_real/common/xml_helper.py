@@ -10,7 +10,7 @@ def extract_link_data(filename:str="./resources/robots/g1_description/g1_29dof_r
     # Iterate over all 'body' elements in 'worldbody'
     for body in root.find("worldbody").iter("body"):
         name = body.get("name", "")
-        if "_link" in name:  # Filter only the link bodies
+        if "_link" in name or (name == 'pelvis'):  # Filter only the link bodies
             inertial = body.find("inertial")
             if inertial is not None:
                 mass = float(inertial.get("mass", "0"))
@@ -28,3 +28,9 @@ def extract_link_data(filename:str="./resources/robots/g1_description/g1_29dof_r
             }
 
     return link_data
+
+def main():
+    print(extract_link_data())
+
+if __name__ == '__main__':
+    main()

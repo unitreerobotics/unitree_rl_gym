@@ -51,6 +51,10 @@ arm_joint: [
   "left_wrist_yaw_joint"
 ]
 
+# non-arm joints; lab-convention
+non_arm_joint: ['left_hip_pitch_joint', 'right_hip_pitch_joint', 'waist_yaw_joint', 'left_hip_roll_joint', 'right_hip_roll_joint', 'waist_roll_joint', 'left_hip_yaw_joint', 'right_hip_yaw_joint', 'waist_pitch_joint', 'left_knee_joint', 'right_knee_joint', 'right_shoulder_pitch_joint', 'left_ankle_pitch_joint', 'right_ankle_pitch_joint', 'right_shoulder_roll_joint', 'left_ankle_roll_joint', 'right_ankle_roll_joint', 'right_shoulder_yaw_joint', 'right_elbow_joint', 'right_wrist_roll_joint', 'right_wrist_pitch_joint', 'right_wrist_yaw_joint']
+
+
 motor_joint: [
         'left_hip_pitch_joint',
         'left_hip_roll_joint',
@@ -151,10 +155,8 @@ dof_vel_scale: 1.0
 action_scale: 0.5
 # cmd_scale: [2.0, 2.0, 0.25]
 cmd_scale: [0.0, 0.0, 0.0]
-# num_actions: 12
-num_actions: 29
-# num_obs: 47
-num_obs: 96
+num_actions: 29 # 22+7
+num_obs: 132
 
 # max_cmd: [0.8, 0.5, 1.57]
 max_cmd: [1.0, 1.0, 1.0]
