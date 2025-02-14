@@ -25,6 +25,7 @@ from yourdfpy import URDF
 from math_utils import *
 import random as rd
 
+
 class Mode(Enum):
     wait = 0
     zero_torque = 1
@@ -67,9 +68,10 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     )
     return quat[..., 1:4] / sin_half_angles_over_angles[..., None]
 
+
 def quat_from_angle_axis(
         angle: torch.Tensor,
-        axis: torch.Tensor=None) -> torch.Tensor:
+        axis: torch.Tensor = None) -> torch.Tensor:
     """Convert rotations given as angle-axis to quaternions.
 
     Args:
@@ -80,13 +82,14 @@ def quat_from_angle_axis(
         The quaternion in (w, x, y, z). Shape is (N, 4).
     """
     if axis is None:
-        axa   = angle
+        axa = angle
         angle = torch.linalg.norm(axa, dim=-1)
-        axis  = axa / angle[..., None].clamp_min(1e-6)
+        axis = axa / angle[..., None].clamp_min(1e-6)
     theta = (angle / 2).unsqueeze(-1)
     xyz = normalize(axis) * theta.sin()
     w = theta.cos()
     return normalize(torch.cat([w, xyz], dim=-1))
+
 
 def quat_mul(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
     """Multiply two quaternions together.
@@ -124,7 +127,6 @@ def quat_mul(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
     z = qq - zz + (z1 + y1) * (w2 - x2)
 
     return torch.stack([w, x, y, z], dim=-1).view(shape)
-
 
 
 def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
@@ -191,7 +193,7 @@ def body_pose(
     xyz = np.array(xyz)
     if rot_type == 'axa':
         axa = axis_angle_from_quat(quat_wxyz)
-        axa = (axa + np.pi) % (2 * np.pi)
+        axa = (axa + np.pi) % (2 * np.pi) - np.pi
         return (xyz, axa)
     elif rot_type == 'quat':
         return (xyz, quat_wxyz)
@@ -207,7 +209,8 @@ def compute_com(tf_buffer, body_frames: List[str]):
     com_list = []
 
     # bring default values
-    com_data = extract_link_data('../../resources/robots/g1_description/g1_29dof_rev_1_0.xml')
+    com_data = extract_link_data(
+        '../../resources/robots/g1_description/g1_29dof_rev_1_0.xml')
 
     # iterate for frames
     for frame in body_frames:
@@ -218,7 +221,7 @@ def compute_com(tf_buffer, body_frames: List[str]):
 
         try:
             link_pos, link_wxyz = body_pose(tf_buffer,
-                    frame, rot_type='quat')
+                                            frame, rot_type='quat')
         except TransformException:
             continue
 
@@ -239,19 +242,16 @@ def compute_com(tf_buffer, body_frames: List[str]):
 
 def index_map(k_to, k_from):
     """
-    returns an index mapping from k_from to k_to;
-    i.e. k_to[index_map] = k_from
+    Returns an index mapping from k_from to k_to.
+
+    Given k_to=a, k_from=b,
+    returns an index map "a_from_b" such that
+    array_a[a_from_b] = array_b
+
     Missing values are set to -1.
     """
-    out = []
-    for k in k_to:
-        try:
-            i = k_from.index(k)
-        except ValueError:
-            i = -1
-        out.append(i)
-
-    return out
+    index_dict = {k: i for i, k in enumerate(k_to)}  # O(len(k_from))
+    return [index_dict.get(k, -1) for k in k_from]  # O(len(k_to))
 
 
 def interpolate_position(pos1, pos2, n_segments):
@@ -259,6 +259,7 @@ def interpolate_position(pos1, pos2, n_segments):
     interp_pos = [pos1 + increments * p for p in range(n_segments)]
     interp_pos.append(pos2)
     return interp_pos
+
 
 class eetrack:
     def __init__(self, root_state_w):
@@ -272,11 +273,11 @@ class eetrack:
         self.create_eetrack()
         self.eetrack_subgoal = self.create_subgoal()
         self.sg_idx = 0
-        self.init_time = rp.time.Time() + 1.0 # first subgoal sampling time = 1.0s
+        self.init_time = rp.time.Time() + 1.0  # first subgoal sampling time = 1.0s
 
     def create_eetrack(self):
-        self.eetrack_start = self.eetrack_midpt.clone() 
-        self.eetrack_end = self.eetrack_midpt.clone() 
+        self.eetrack_start = self.eetrack_midpt.clone()
+        self.eetrack_end = self.eetrack_midpt.clone()
         is_hor = rd.choice([True, False])
         eetrack_offset = rd.uniform(-0.5, 0.5)
         # For testing
@@ -296,35 +297,40 @@ class eetrack:
 
     def create_direction(self):
         angle_from_eetrack_line = torch.rand(1, device=self.device) * np.pi
-        angle_from_xyplane_in_global_frame  = torch.rand(1, device=self.device) * np.pi - np.pi/2
+        angle_from_xyplane_in_global_frame = torch.rand(
+            1, device=self.device) * np.pi - np.pi / 2
         # For testing
-        angle_from_eetrack_line = torch.rand(1, device=self.device) * np.pi/2
-        angle_from_xyplane_in_global_frame  = torch.rand(1, device=self.device) * 0
+        angle_from_eetrack_line = torch.rand(1, device=self.device) * np.pi / 2
+        angle_from_xyplane_in_global_frame = torch.rand(
+            1, device=self.device) * 0
         roll = torch.zeros(1, device=self.device)
-        pitch = angle_from_xyplane_in_global_frame 
+        pitch = angle_from_xyplane_in_global_frame
         yaw = angle_from_eetrack_line
         euler = torch.stack([roll, pitch, yaw], dim=1)
-        quat = math_utils.quat_from_euler_xyz(euler[:,0], euler[:,1], euler[:,2])
+        quat = math_utils.quat_from_euler_xyz(
+            euler[:, 0], euler[:, 1], euler[:, 2])
         return quat
-        
+
     def create_subgoal(self):
-        eetrack_subgoals = interpolate_position(self.eetrack_start, self.eetrack_end, self.number_of_subgoals)
+        eetrack_subgoals = interpolate_position(
+            self.eetrack_start, self.eetrack_end, self.number_of_subgoals)
         eetrack_subgoals = [
             (
                 l.clone().to(self.device, dtype=torch.float32)
-                if isinstance(l, torch.Tensor) 
+                if isinstance(l, torch.Tensor)
                 else torch.tensor(l, device=self.device, dtype=torch.float32)
             )
             for l in eetrack_subgoals
         ]
-        eetrack_subgoals = torch.stack(eetrack_subgoals,axis=1)
-        eetrack_ori = self.create_direction().unsqueeze(1).repeat(1, self.number_of_subgoals + 1, 1)
+        eetrack_subgoals = torch.stack(eetrack_subgoals, axis=1)
+        eetrack_ori = self.create_direction().unsqueeze(
+            1).repeat(1, self.number_of_subgoals + 1, 1)
         # welidng_subgoals -> Nenv x Npoints x (3 + 4)
         return torch.cat([eetrack_subgoals, eetrack_ori], dim=2)
 
     def update_command(self):
         time = self.init_time - rp.time.Time()
-        if (time>=0):
+        if (time >= 0):
             self.sg_idx = time / 0.1 + 1
         self.sg_idx.clamp_(0, self.number_of_subgoals + 1)
         self.next_command_s_left = self.eetrack_subgoal[self.sg_idx]
@@ -332,7 +338,8 @@ class eetrack:
     def get_command(self, root_state_w):
         self.update_command()
 
-        pos_hand_b_left, quat_hand_b_left = body_pose_axa("left_hand_palm_link")
+        pos_hand_b_left, quat_hand_b_left = body_pose_axa(
+            "left_hand_palm_link")
 
         lerp_command_w_left = self.next_command_s_left
 
@@ -527,7 +534,7 @@ class Controller:
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
         # FIXME(ycho): give `root_state_w`
-        # self.eetrack = eetrack(root_state_w=None) 
+        # self.eetrack = eetrack(root_state_w=None)
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -687,7 +694,7 @@ class Controller:
                                   self.action,
                                   _hands_command_)
         Path('/tmp/eet/').mkdir(parents=True,
-                exist_ok=True)
+                                exist_ok=True)
         np.save(F'/tmp/eet/obs{self.counter:03d}.npy',
                 self.obs)
 
@@ -705,9 +712,8 @@ class Controller:
             i_pin = self.pin_from_mot[i_mot]
             q_pin[i_pin] = self.low_state.motor_state[i_mot].q
 
-        
         d_quat = quat_from_angle_axis(
-                torch.from_numpy(_hands_command_[..., 3:])
+            torch.from_numpy(_hands_command_[..., 3:])
         ).detach().cpu().numpy()
 
         source_pose = self.ikctrl.fk(q_pin)
@@ -715,8 +721,9 @@ class Controller:
         source_quat = xyzw2wxyz(pin.Quaternion(source_pose.rotation).coeffs())
 
         target_xyz = source_xyz + _hands_command_[..., :3]
-        target_quat = quat_mul(torch.from_numpy(d_quat),
-                torch.from_numpy(source_quat)).detach().cpu().numpy()
+        target_quat = quat_mul(
+            torch.from_numpy(d_quat),
+            torch.from_numpy(source_quat)).detach().cpu().numpy()
         target = np.concatenate([target_xyz, target_quat])
 
         res_q_ik = self.ikctrl(

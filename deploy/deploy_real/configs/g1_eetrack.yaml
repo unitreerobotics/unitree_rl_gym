@@ -41,6 +41,7 @@ lab_joint: [
  'right_wrist_yaw_joint'
 ]
 
+
 arm_joint: [
   "left_shoulder_pitch_joint",
   "left_shoulder_roll_joint",
