@@ -47,10 +47,20 @@ class Config:
             else:
                 self.motor_joint=[]
 
-            if 'act_joint' in config:
-                self.act_joint = config['act_joint']
+            if 'arm_joint' in config:
+                self.arm_joint = config['arm_joint']
             else:
-                self.act_joint=[]
+                self.arm_joint=[]
+
+            if 'lab_joint' in config:
+                self.lab_joint = config['lab_joint']
+            else:
+                self.lab_joint=[]
+                
+            if 'lab_joint_offsets' in config:
+                self.lab_joint_offsets = config['lab_joint_offsets']
+            else:
+                self.lab_joint_offsets=[]
                 
             self.ang_vel_scale = config["ang_vel_scale"]
             self.dof_pos_scale = config["dof_pos_scale"]

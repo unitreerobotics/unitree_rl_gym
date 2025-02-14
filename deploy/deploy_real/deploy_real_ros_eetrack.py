@@ -16,6 +16,8 @@ from common.remote_controller import RemoteController, KeyMap
 from config import Config
 from common.crc import CRC
 from enum import Enum
+import pinocchio as pin
+from ikctrl import IKCtrl, xyzw2wxyz
 
 
 class Mode(Enum):
@@ -164,10 +166,16 @@ def index_map(k_to, k_from):
     """
     returns an index mapping from k_from to k_to;
     i.e. k_to[index_map] = k_from
+    Missing values are set to -1.
     """
     out = []
     for k in k_to:
-        out.append(k_from.index(k))
+        try:
+            i = k_from.index(k)
+        except ValueError:
+            i = -1
+        out.append(i)
+        
     return out
 
 
@@ -214,6 +222,8 @@ class Observation:
         hp_r = body_pose_axa(self.tf_buffer, 'right_hand_palm_link')
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
+        # FIXME(ycho): implement com_pos_wrt_pelvis
+        com_pos_wrt_pelvis=np.zeros(3)
         projected_com = quat_rotate_inverse(
             quat, com_pos_wrt_pelvis
         )
@@ -231,7 +241,8 @@ class Observation:
                                    range(len(lab_from_mot))]
         actions = last_action
 
-        hands_command = hands_command
+        # Given as delta_pos {xyz,axa}; i.e. 6D vector
+        hands_command = hands_command 
         
         right_arm_com = compute_com([
             "right_shoulder_pitch_link",
@@ -251,7 +262,6 @@ class Observation:
             "left_wrist_roll_link",
             "left_wrist_yaw_link"
         ])
-
         if True:  # hack
             lf_from_pelvis = self.tf_buffer.lookup_transform(
                 'left_ankle_roll_link',  # to
@@ -297,17 +307,36 @@ class Controller:
 
         # Initialize the policy network
         self.policy = torch.jit.load(config.policy_path)
-        # Initializing process variables
-        self.qj = np.zeros(config.num_actions, dtype=np.float32)
-        self.dqj = np.zeros(config.num_actions, dtype=np.float32)
         self.action = np.zeros(config.num_actions, dtype=np.float32)
-        self.target_dof_pos = config.default_angles.copy()
+        self.ikctrl = IKCtrl('../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
+                             config.ik_joint)
+        self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
+        self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
+
+        # == build index map ==
+        arm_joint = config.arm_joint
+        self.mot_from_pin = index_map(
+            self.config.motor_joint,
+            self.ikctrl.joint_names)
+        self.pin_from_mot = index_map(
+            self.ikctrl.joint_names,
+            self.config.motor_joint
+        )
+        self.mot_from_arm = index_map(
+            self.config.motor_joint,
+            self.config.arm_joint
+        )
+        
+        # Data buffers
         self.obs = np.zeros(config.num_obs, dtype=np.float32)
         self.cmd = np.array([0.0, 0, 0])
         self.counter = 0
 
+        # ROS handles & helpers
         rp.init()
         self._node = rp.create_node("low_level_cmd_sender")
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.obsmap = Observation(config, self.tf_buffer)
 
         if config.msg_type == "hg":
@@ -322,12 +351,6 @@ class Controller:
                 LowStateHG, 'lowstate', self.LowStateHgHandler, 10)
             self.mode_pr_ = MotorMode.PR
             self.mode_machine_ = 0
-
-            # self.lowcmd_publisher_ = ChannelPublisher(config.lowcmd_topic, LowCmdHG)
-            # self.lowcmd_publisher_.Init()
-
-            # self.lowstate_subscriber = ChannelSubscriber(config.lowstate_topic, LowStateHG)
-            # self.lowstate_subscriber.Init(self.LowStateHgHandler, 10)
 
         elif config.msg_type == "go":
             raise ValueError(f"{config.msg_type} is not implemented yet.")
@@ -374,13 +397,6 @@ class Controller:
         cmd.mode_machine = self.mode_machine_
         cmd.crc = CRC().Crc(cmd)
         size = len(cmd.motor_cmd)
-        # print(cmd.mode_machine)
-        # for i in range(size):
-        #     print(i, cmd.motor_cmd[i].q,
-        #         cmd.motor_cmd[i].dq,
-        #         cmd.motor_cmd[i].kp,
-        #         cmd.motor_cmd[i].kd,
-        #         cmd.motor_cmd[i].tau)
         self.lowcmd_publisher_.publish(cmd)
 
     def wait_for_low_state(self):
@@ -468,70 +484,56 @@ class Controller:
             return
         self.counter += 1
 
-        obs = self.obsmap(self.low_state,
-                          self.last_action,
-                          hands_command)
+        # TODO(ycho): consider using `cmd` for `hands_command`
+        # self.cmd[0] = self.remote_controller.ly
+        # self.cmd[1] = self.remote_controller.lx * -1
+        # self.cmd[2] = self.remote_controller.rx * -1
 
-        # create observation
-        gravity_orientation = get_gravity_orientation(quat)
-        qj_obs = self.qj.copy()
-        dqj_obs = self.dqj.copy()
-        qj_obs = (
-            qj_obs - self.config.default_angles) * self.config.dof_pos_scale
-        dqj_obs = dqj_obs * self.config.dof_vel_scale
-        ang_vel = ang_vel * self.config.ang_vel_scale
-        period = 0.8
-        count = self.counter * self.config.control_dt
-        phase = count % period / period
-        sin_phase = np.sin(2 * np.pi * phase)
-        cos_phase = np.cos(2 * np.pi * phase)
+        # FIXME(ycho): implement `_hands_command_`
+        _hands_command_ = np.zeros(6)
 
-        self.cmd[0] = self.remote_controller.ly
-        self.cmd[1] = self.remote_controller.lx * -1
-        self.cmd[2] = self.remote_controller.rx * -1
-        # print(self.remote_controller.ly,
-        #     self.remote_controller.lx,
-        #     self.remote_controller.rx)
-        # self.cmd[0] = 0.0
-        # self.cmd[1] = 0.0
-        # self.cmd[2] = 0.0
-
-        num_actions = self.config.num_actions
-        self.obs[:3] = ang_vel
-        self.obs[3:6] = gravity_orientation
-        self.obs[6:9] = self.cmd * self.config.cmd_scale * self.config.max_cmd
-        self.obs[9: 9 + num_actions] = qj_obs
-        self.obs[9 + num_actions: 9 + num_actions * 2] = dqj_obs
-        self.obs[9 + num_actions * 2: 9 + num_actions * 3] = self.action
-        self.obs[9 + num_actions * 3] = sin_phase
-        self.obs[9 + num_actions * 3 + 1] = cos_phase
+        self.obs[:] = self.obsmap(self.low_state,
+                                  self.action,
+                                  _hands_command_)
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
 
-        # transform action to target_dof_pos
-        target_dof_pos = self.config.default_angles + self.action * self.config.action_scale
+        act_joint_pos = self.action[..., :15]
+        left_arm_residual = self.action[..., 15:22]
+        
+        q_pin = np.zeros_like(self.ikctrl.cfg.q0)
+        for i_mot in range(len(self.config.motor_joint)):
+            i_pin = self.pin_from_mot[i_mot]
+            q_pin[i_pin] = self.low_state.motor_state[i_mot].q
+        res_q_ik = self.ikctrl(
+            q_pin,
+            _hands_command_
+        )
+
+        target_dof_pos = np.zeros(29)
+        for i_act in range(len(res_q_ik)):
+            i_mot = self.mot_from_act[i_act]
+            i_pin = self.pin_from_mot[i_mot]
+            target_q = (
+                    self.low_state.motor_state[i_mot].q
+                    + res_q_ik[i_act]
+                    + np.clip(0.3 * left_arm_residual[i_act],
+                              -0.2, 0.2)
+            )
+            target_q = np.clip(target_q,
+                               self.lim_lo_pin[i_pin],
+                               self.lim_hi_pin[i_pin])
+            target_dof_pos[i_mot] = target_q
 
         # Build low cmd
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            motor_idx = self.config.leg_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = float(target_dof_pos[i])
-            self.low_cmd.motor_cmd[motor_idx].dq = 0.0
-            self.low_cmd.motor_cmd[motor_idx].kp = float(self.config.kps[i])
-            self.low_cmd.motor_cmd[motor_idx].kd = float(self.config.kds[i])
-            self.low_cmd.motor_cmd[motor_idx].tau = 0.0
-
-        for i in range(len(self.config.arm_waist_joint2motor_idx)):
-            motor_idx = self.config.arm_waist_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = float(
-                self.config.arm_waist_target[i])
-            self.low_cmd.motor_cmd[motor_idx].dq = 0.0
-            self.low_cmd.motor_cmd[motor_idx].kp = float(
-                self.config.arm_waist_kps[i])
-            self.low_cmd.motor_cmd[motor_idx].kd = float(
-                self.config.arm_waist_kds[i])
-            self.low_cmd.motor_cmd[motor_idx].tau = 0.0
+        for i in range(len(self.config.motor_joint)):
+            self.low_cmd.motor_cmd[i].q = float(target_dof_pos[i])
+            self.low_cmd.motor_cmd[i].dq = 0.0
+            self.low_cmd.motor_cmd[i].kp = float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].tau = 0.0
 
         # send the command
         self.send_cmd(self.low_cmd)

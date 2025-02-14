@@ -41,13 +41,7 @@ lab_joint: [
  'right_wrist_yaw_joint'
 ]
 
-
-
-
-
-
-
-act_joint: [
+arm_joint: [
   "left_shoulder_pitch_joint",
   "left_shoulder_roll_joint",
   "left_shoulder_yaw_joint",
@@ -56,6 +50,7 @@ act_joint: [
   "left_wrist_pitch_joint",
   "left_wrist_yaw_joint"
 ]
+
 motor_joint: [
         'left_hip_pitch_joint',
         'left_hip_roll_joint',
