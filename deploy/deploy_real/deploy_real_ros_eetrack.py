@@ -81,11 +81,12 @@ def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     return a - b + c
 
 
-def body_pose_axa(
+def body_pose(
         tf_buffer,
         frame: str,
         ref_frame: str = 'pelvis',
-        stamp=None):
+        stamp=None,
+        rot_type:str='axa'):
     """ --> tf does not exist """
     if stamp is None:
         stamp = rp.time.Time()
@@ -106,53 +107,34 @@ def body_pose_axa(
     quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
 
     xyz = np.array(xyz)
-    axa = axis_angle_from_quat(quat_wxyz)
-    axa = (axa + np.pi) % (2 * np.pi)
-
-    return (xyz, axa)
-
-def body_pose_quat(frame:str):
-    try:
-        t = tf_buffer.lookup_transform(
-            to_frame_rel,
-            from_frame_rel,
-            rclpy.time.Time())
-    except TransformException as ex:
-        print(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
-        return (np.zeros(3), np.zeros(3))
-
-    txn = t.transform.translation
-    rxn = t.transform.rotation
-
-    xyz = [txn.x, txn.y, txn.z]
-    quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
-
-    return (xyz, quat_wxyz)
+    if rot_type == 'axa':
+        axa = axis_angle_from_quat(quat_wxyz)
+        axa = (axa + np.pi) % (2 * np.pi)
+        return (xyz, axa)
+    elif rot_type == 'quat':
+        return (xyz, quat_wxyz)
+    raise ValueError(f"Unknown rot_type: {rot_type}")
 
 from common.xml_helper import extract_link_data
+
 def compute_com(body_frames:list[str]):
     """compute com of body frames"""
     mass_list = []
     com_list = []
     
     # bring default values
-    default_robot_data = extract_link_data()
+    com_data = extract_link_data()
 
     # iterate for frames
     for frame in body_frames:
-        frame_data = default_robot_data[frame]
-        link_pos, link_wxyz = body_pose_axa(frame)
+        frame_data = com_data[frame]
+        link_pos, link_wxyz = body_pose(frame, rot_type='quat')
         com_pos_b, com_wxyz = frame_data['pos'], frame_data['quat']
 
         # compute com from world coordinates
         # NOTE 'math_utils' package will be brought from isaaclab
-        link_com_pos_w,  _ = math_utils.combine_frame_transform(
-            link_pos,
-            link_wxyz,
-            com_pos_b,
-            com_wxyz
-        )
-        com_list.append(link_com_pos_w)
+        com_pos = link_pos + quat_rotate(link_wxyz, com_pos_b)
+        com_list.append(com_pos)
 
         # get math
         mass = frame_data['mass']
@@ -196,11 +178,10 @@ class Observation:
         num_lab_joint = self.num_lab_joint
         # observation terms (order preserved)
 
-        # NOTE(ycho): dummy value
+        # FIXME(ycho): dummy value
         # base_lin_vel = np.zeros(3)
         ang_vel = np.array([low_state.imu_state.gyroscope],
                                 dtype=np.float32)
-        # FIXME(ycho): check if the convention "q_base^{-1} @ g" holds.
         quat = low_state.imu_state.quaternion
         if self.config.imu_type == "torso":
             waist_yaw = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
@@ -212,18 +193,19 @@ class Observation:
                 imu_omega=ang_vel)
         base_ang_vel = ang_vel
 
+        # TODO(ycho): check if the convention "q_base^{-1} @ g" holds.
         projected_gravity = get_gravity_orientation(quat)
 
-        fp_l = body_pose_axa(self.tf_buffer, 'left_ankle_roll_link')
-        fp_r = body_pose_axa(self.tf_buffer, 'right_ankle_roll_link')
+        fp_l = body_pose(self.tf_buffer, 'left_ankle_roll_link')
+        fp_r = body_pose(self.tf_buffer, 'right_ankle_roll_link')
         foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
 
-        hp_l = body_pose_axa(self.tf_buffer, 'left_hand_palm_link')
-        hp_r = body_pose_axa(self.tf_buffer, 'right_hand_palm_link')
+        hp_l = body_pose(self.tf_buffer, 'left_hand_palm_link')
+        hp_r = body_pose(self.tf_buffer, 'right_hand_palm_link')
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
         # FIXME(ycho): implement com_pos_wrt_pelvis
-        com_pos_wrt_pelvis=np.zeros(3)
+        com_pos_wrt_pelvis=compute_com(_all_frames_)
         projected_com = quat_rotate_inverse(
             quat, com_pos_wrt_pelvis
         )
