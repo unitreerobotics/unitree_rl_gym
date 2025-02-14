@@ -109,6 +109,56 @@ def body_pose_axa(
 
     return (xyz, axa)
 
+def body_pose_quat(frame:str):
+    try:
+        t = tf_buffer.lookup_transform(
+            to_frame_rel,
+            from_frame_rel,
+            rclpy.time.Time())
+    except TransformException as ex:
+        print(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+        return (np.zeros(3), np.zeros(3))
+
+    txn = t.transform.translation
+    rxn = t.transform.rotation
+
+    xyz = [txn.x, txn.y, txn.z]
+    quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
+
+    return (xyz, quat_wxyz)
+
+from common.xml_helper import extract_link_data
+def compute_com(body_frames:list[str]):
+    """compute com of body frames"""
+    mass_list = []
+    com_list = []
+    
+    # bring default values
+    default_robot_data = extract_link_data()
+
+    # iterate for frames
+    for frame in body_frames:
+        frame_data = default_robot_data[frame]
+        link_pos, link_wxyz = body_pose_axa(frame)
+        com_pos_b, com_wxyz = frame_data['pos'], frame_data['quat']
+
+        # compute com from world coordinates
+        # NOTE 'math_utils' package will be brought from isaaclab
+        link_com_pos_w,  _ = math_utils.combine_frame_transform(
+            link_pos,
+            link_wxyz,
+            com_pos_b,
+            com_wxyz
+        )
+        com_list.append(link_com_pos_w)
+
+        # get math
+        mass = frame_data['mass']
+        mass_list.append(mass)
+    
+    com = sum([m*pos for m, pos in zip(mass_list, com_list)]) / sum(mass_list)
+    return com
+
 
 def index_map(k_to, k_from):
     """
@@ -182,8 +232,25 @@ class Observation:
         actions = last_action
 
         hands_command = hands_command
-        right_arm_com = _
-        left_arm_com = _
+        
+        right_arm_com = compute_com([
+            "right_shoulder_pitch_link",
+            "right_shoulder_roll_link",
+            "right_shoulder_yaw_link",
+            "right_elbow_link",
+            "right_wrist_pitch_link"
+            "right_wrist_roll_link",
+            "right_wrist_yaw_link"
+        ])
+        left_arm_com = compute_com([
+            "left_shoulder_pitch_link",
+            "left_shoulder_roll_link",
+            "left_shoulder_yaw_link",
+            "left_elbow_link",
+            "left_wrist_pitch_link"
+            "left_wrist_roll_link",
+            "left_wrist_yaw_link"
+        ])
 
         if True:  # hack
             lf_from_pelvis = self.tf_buffer.lookup_transform(
