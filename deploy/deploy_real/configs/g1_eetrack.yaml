@@ -7,7 +7,7 @@ imu_type: "pelvis"    # "torso" or "pelvis"
 lowcmd_topic: "rt/lowcmd"
 lowstate_topic: "rt/lowstate"
 
-policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/policy.pt"
+policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/policy_eetrack.pt"
 
 lab_joint: [
   'left_hip_pitch_joint',
