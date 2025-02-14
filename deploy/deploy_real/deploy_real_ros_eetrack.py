@@ -3,6 +3,7 @@ from typing import Union, List
 import numpy as np
 import time
 import torch
+from pathlib import Path
 
 import rclpy as rp
 from unitree_hg.msg import LowCmd as LowCmdHG, LowState as LowStateHG
@@ -65,6 +66,65 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
         0.5 - angle * angle / 48
     )
     return quat[..., 1:4] / sin_half_angles_over_angles[..., None]
+
+def quat_from_angle_axis(
+        angle: torch.Tensor,
+        axis: torch.Tensor=None) -> torch.Tensor:
+    """Convert rotations given as angle-axis to quaternions.
+
+    Args:
+        angle: The angle turned anti-clockwise in radians around the vector's direction. Shape is (N,).
+        axis: The axis of rotation. Shape is (N, 3).
+
+    Returns:
+        The quaternion in (w, x, y, z). Shape is (N, 4).
+    """
+    if axis is None:
+        axa   = angle
+        angle = torch.linalg.norm(axa, dim=-1)
+        axis  = axa / angle[..., None].clamp_min(1e-6)
+    theta = (angle / 2).unsqueeze(-1)
+    xyz = normalize(axis) * theta.sin()
+    w = theta.cos()
+    return normalize(torch.cat([w, xyz], dim=-1))
+
+def quat_mul(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
+    """Multiply two quaternions together.
+
+    Args:
+        q1: The first quaternion in (w, x, y, z). Shape is (..., 4).
+        q2: The second quaternion in (w, x, y, z). Shape is (..., 4).
+
+    Returns:
+        The product of the two quaternions in (w, x, y, z). Shape is (..., 4).
+
+    Raises:
+        ValueError: Input shapes of ``q1`` and ``q2`` are not matching.
+    """
+    # check input is correct
+    if q1.shape != q2.shape:
+        msg = f"Expected input quaternion shape mismatch: {q1.shape} != {q2.shape}."
+        raise ValueError(msg)
+    # reshape to (N, 4) for multiplication
+    shape = q1.shape
+    q1 = q1.reshape(-1, 4)
+    q2 = q2.reshape(-1, 4)
+    # extract components from quaternions
+    w1, x1, y1, z1 = q1[:, 0], q1[:, 1], q1[:, 2], q1[:, 3]
+    w2, x2, y2, z2 = q2[:, 0], q2[:, 1], q2[:, 2], q2[:, 3]
+    # perform multiplication
+    ww = (z1 + x1) * (x2 + y2)
+    yy = (w1 - y1) * (w2 + z2)
+    zz = (w1 + y1) * (w2 - z2)
+    xx = ww + yy + zz
+    qq = 0.5 * (xx + (z1 - x1) * (x2 - y2))
+    w = qq - ww + (z1 - y1) * (y2 - z2)
+    x = qq - xx + (x1 + w1) * (x2 + w2)
+    y = qq - yy + (w1 - x1) * (y2 + z2)
+    z = qq - zz + (z1 + y1) * (w2 - x2)
+
+    return torch.stack([w, x, y, z], dim=-1).view(shape)
+
 
 
 def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
@@ -331,7 +391,7 @@ class Observation:
                 waist_yaw_omega=waist_yaw_omega,
                 imu_quat=quat,
                 imu_omega=ang_vel)
-        base_ang_vel = ang_vel
+        base_ang_vel = ang_vel.squeeze(0)
 
         # TODO(ycho): check if the convention "q_base^{-1} @ g" holds.
         projected_gravity = get_gravity_orientation(quat)
@@ -345,7 +405,7 @@ class Observation:
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
         # FIXME(ycho): implement com_pos_wrt_pelvis
-        projected_com = compute_com(self.tf_buffer, self.links)
+        projected_com = compute_com(self.tf_buffer, self.links)[..., :2]
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
@@ -417,7 +477,7 @@ class Observation:
             left_arm_com,
             pelvis_height
         ]
-        print([np.shape(o) for o in obs])
+        # print([np.shape(o) for o in obs])
         return np.concatenate(obs, axis=-1)
 
 
@@ -626,37 +686,61 @@ class Controller:
         self.obs[:] = self.obsmap(self.low_state,
                                   self.action,
                                   _hands_command_)
+        Path('/tmp/eet/').mkdir(parents=True,
+                exist_ok=True)
+        np.save(F'/tmp/eet/obs{self.counter:03d}.npy',
+                self.obs)
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
+        np.save(F'/tmp/eet/act{self.counter:03d}.npy',
+                self.action)
 
         non_arm_joint_pos = self.action[..., :22]
         left_arm_residual = self.action[..., 22:29]
 
-        q_pin = np.zeros_like(self.ikctrl.cfg.q0)
+        q_pin = np.zeros_like(self.ikctrl.cfg.q)
         for i_mot in range(len(self.config.motor_joint)):
             i_pin = self.pin_from_mot[i_mot]
             q_pin[i_pin] = self.low_state.motor_state[i_mot].q
+
+        
+        d_quat = quat_from_angle_axis(
+                torch.from_numpy(_hands_command_[..., 3:])
+        ).detach().cpu().numpy()
+
+        source_pose = self.ikctrl.fk(q_pin)
+        source_xyz = source_pose.translation
+        source_quat = xyzw2wxyz(pin.Quaternion(source_pose.rotation).coeffs())
+
+        target_xyz = source_xyz + _hands_command_[..., :3]
+        target_quat = quat_mul(torch.from_numpy(d_quat),
+                torch.from_numpy(source_quat)).detach().cpu().numpy()
+        target = np.concatenate([target_xyz, target_quat])
+
         res_q_ik = self.ikctrl(
             q_pin,
-            _hands_command_
+            target
         )
+        print('res_q_ik', res_q_ik)
 
         target_dof_pos = np.zeros(29)
-        for i_act in range(len(res_q_ik)):
-            i_mot = self.mot_from_act[i_act]
+        for i_arm in range(len(res_q_ik)):
+            i_mot = self.mot_from_arm[i_arm]
             i_pin = self.pin_from_mot[i_mot]
             target_q = (
                 self.low_state.motor_state[i_mot].q
-                + res_q_ik[i_act]
-                + np.clip(0.3 * left_arm_residual[i_act],
+                + res_q_ik[i_arm]
+                + np.clip(0.3 * left_arm_residual[i_arm],
                           -0.2, 0.2)
             )
             target_q = np.clip(target_q,
                                self.lim_lo_pin[i_pin],
                                self.lim_hi_pin[i_pin])
             target_dof_pos[i_mot] = target_q
+        np.save(F'/tmp/eet/dof{self.counter:03d}.npy',
+                target_dof_pos)
 
         # Build low cmd
         for i in range(len(self.config.motor_joint)):
