@@ -304,9 +304,6 @@ class Observation:
         self.tf_buffer = tf_buffer
         self.lab_from_mot = index_map(config.lab_joint,
                                       config.motor_joint)
-        # initial state of root
-        # FIXME(ycho): implement
-        self.eetrack = eetrack(root_state_w= ... ) 
 
     def __call__(self,
                  low_state: LowStateHG,
@@ -360,7 +357,7 @@ class Observation:
         actions = last_action
 
         # Given as delta_pos {xyz,axa}; i.e. 6D vector
-        hands_command = self.eetrack.get_command()
+        # hands_command = self.eetrack.get_command()
 
         right_arm_com = compute_com([
             "right_shoulder_pitch_link",
@@ -459,6 +456,8 @@ class Controller:
         self.obsmap = Observation(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
+        # FIXME(ycho): give `root_state_w`
+        # self.eetrack = eetrack(root_state_w=None) 
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -611,6 +610,7 @@ class Controller:
         # self.cmd[2] = self.remote_controller.rx * -1
 
         # FIXME(ycho): implement `_hands_command_`
+        # to use the output of `eetrack`.
         _hands_command_ = np.zeros(6)
 
         self.obs[:] = self.obsmap(self.low_state,
@@ -652,8 +652,8 @@ class Controller:
         for i in range(len(self.config.motor_joint)):
             self.low_cmd.motor_cmd[i].q = float(target_dof_pos[i])
             self.low_cmd.motor_cmd[i].dq = 0.0
-            self.low_cmd.motor_cmd[i].kp = float(self.config.kps[i])
-            self.low_cmd.motor_cmd[i].kd = float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].kp = 0.0 * float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = 0.0 * float(self.config.kds[i])
             self.low_cmd.motor_cmd[i].tau = 0.0
 
         # send the command
