@@ -18,6 +18,7 @@ from common.crc import CRC
 from enum import Enum
 import pinocchio as pin
 from ikctrl import IKCtrl, xyzw2wxyz
+from yourdfpy import URDF
 
 
 class Mode(Enum):
@@ -63,6 +64,24 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
 
 
+def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Rotate a vector by a quaternion along the last dimension of q and v.
+
+    Args:
+        q: The quaternion in (w, x, y, z). Shape is (..., 4).
+        v: The vector in (x, y, z). Shape is (..., 3).
+
+    Returns:
+        The rotated vector in (x, y, z). Shape is (..., 3).
+    """
+    q_w = q[..., 0]
+    q_vec = q[..., 1:]
+    a = v * (2.0 * q_w**2 - 1.0).unsqueeze(-1)
+    b = np.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
+    c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
+    return a + b + c
+
+
 def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     """Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
 
@@ -86,7 +105,7 @@ def body_pose(
         frame: str,
         ref_frame: str = 'pelvis',
         stamp=None,
-        rot_type:str='axa'):
+        rot_type: str = 'axa'):
     """ --> tf does not exist """
     if stamp is None:
         stamp = rp.time.Time()
@@ -98,7 +117,7 @@ def body_pose(
             stamp)
     except TransformException as ex:
         print(f'Could not transform {frame} to {ref_frame}: {ex}')
-        return (np.zeros(3), np.zeros(3))
+        raise
 
     txn = t.transform.translation
     rxn = t.transform.rotation
@@ -115,20 +134,27 @@ def body_pose(
         return (xyz, quat_wxyz)
     raise ValueError(f"Unknown rot_type: {rot_type}")
 
+
 from common.xml_helper import extract_link_data
 
-def compute_com(body_frames:list[str]):
+
+def compute_com(body_frames: list[str]):
     """compute com of body frames"""
     mass_list = []
     com_list = []
-    
+
     # bring default values
     com_data = extract_link_data()
 
     # iterate for frames
     for frame in body_frames:
         frame_data = com_data[frame]
-        link_pos, link_wxyz = body_pose(frame, rot_type='quat')
+
+        try:
+            link_pos, link_wxyz = body_pose(frame, rot_type='quat')
+        except TransformException:
+            continue
+
         com_pos_b, com_wxyz = frame_data['pos'], frame_data['quat']
 
         # compute com from world coordinates
@@ -139,8 +165,8 @@ def compute_com(body_frames:list[str]):
         # get math
         mass = frame_data['mass']
         mass_list.append(mass)
-    
-    com = sum([m*pos for m, pos in zip(mass_list, com_list)]) / sum(mass_list)
+
+    com = sum([m * pos for m, pos in zip(mass_list, com_list)]) / sum(mass_list)
     return com
 
 
@@ -157,12 +183,16 @@ def index_map(k_to, k_from):
         except ValueError:
             i = -1
         out.append(i)
-        
+
     return out
 
 
 class Observation:
-    def __init__(self, config, tf_buffer: Buffer):
+    def __init__(self,
+                 urdf_path: str,
+                 config,
+                 tf_buffer: Buffer):
+        self.links = list(URDF.load(urdf_path).link_map.keys())
         self.config = config
         self.num_lab_joint = len(config.lab_joint)
         self.tf_buffer = tf_buffer
@@ -181,7 +211,7 @@ class Observation:
         # FIXME(ycho): dummy value
         # base_lin_vel = np.zeros(3)
         ang_vel = np.array([low_state.imu_state.gyroscope],
-                                dtype=np.float32)
+                           dtype=np.float32)
         quat = low_state.imu_state.quaternion
         if self.config.imu_type == "torso":
             waist_yaw = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
@@ -205,10 +235,7 @@ class Observation:
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
         # FIXME(ycho): implement com_pos_wrt_pelvis
-        com_pos_wrt_pelvis=compute_com(_all_frames_)
-        projected_com = quat_rotate_inverse(
-            quat, com_pos_wrt_pelvis
-        )
+        projected_com = compute_com(self.links)
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
@@ -224,8 +251,8 @@ class Observation:
         actions = last_action
 
         # Given as delta_pos {xyz,axa}; i.e. 6D vector
-        hands_command = hands_command 
-        
+        hands_command = hands_command
+
         right_arm_com = compute_com([
             "right_shoulder_pitch_link",
             "right_shoulder_roll_link",
@@ -290,8 +317,9 @@ class Controller:
         # Initialize the policy network
         self.policy = torch.jit.load(config.policy_path)
         self.action = np.zeros(config.num_actions, dtype=np.float32)
-        self.ikctrl = IKCtrl('../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
-                             config.ik_joint)
+        self.ikctrl = IKCtrl(
+            '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
+            config.ik_joint)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
         self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
 
@@ -308,7 +336,7 @@ class Controller:
             self.config.motor_joint,
             self.config.arm_joint
         )
-        
+
         # Data buffers
         self.obs = np.zeros(config.num_obs, dtype=np.float32)
         self.cmd = np.array([0.0, 0, 0])
@@ -319,7 +347,9 @@ class Controller:
         self._node = rp.create_node("low_level_cmd_sender")
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.obsmap = Observation(config, self.tf_buffer)
+        self.obsmap = Observation(
+            '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
+            config, self.tf_buffer)
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -484,7 +514,7 @@ class Controller:
 
         act_joint_pos = self.action[..., :15]
         left_arm_residual = self.action[..., 15:22]
-        
+
         q_pin = np.zeros_like(self.ikctrl.cfg.q0)
         for i_mot in range(len(self.config.motor_joint)):
             i_pin = self.pin_from_mot[i_mot]
@@ -499,10 +529,10 @@ class Controller:
             i_mot = self.mot_from_act[i_act]
             i_pin = self.pin_from_mot[i_mot]
             target_q = (
-                    self.low_state.motor_state[i_mot].q
-                    + res_q_ik[i_act]
-                    + np.clip(0.3 * left_arm_residual[i_act],
-                              -0.2, 0.2)
+                self.low_state.motor_state[i_mot].q
+                + res_q_ik[i_act]
+                + np.clip(0.3 * left_arm_residual[i_act],
+                          -0.2, 0.2)
             )
             target_q = np.clip(target_q,
                                self.lim_lo_pin[i_pin],

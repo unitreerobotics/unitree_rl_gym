@@ -139,6 +139,7 @@ class IKCtrl:
 
 
 def main():
+    from yourdfpy import URDF
     urdf_path = '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf'
 
     # == init yourdfpy robot ==
