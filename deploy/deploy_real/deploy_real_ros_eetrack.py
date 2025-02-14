@@ -17,6 +17,7 @@ from config import Config
 from common.crc import CRC
 from enum import Enum
 
+
 class Mode(Enum):
     wait = 0
     zero_torque = 1
@@ -24,7 +25,8 @@ class Mode(Enum):
     damping = 3
     policy = 4
     null = 5
-       
+
+
 def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     """Convert rotations given as quaternions to axis/angle.
 
@@ -44,7 +46,8 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     # Axis-angle is [a_x, a_y, a_z] = [theta * n_x, theta * n_y, theta * n_z]
     # Thus, axis-angle is [q_x, q_y, q_z] / (sin(theta/2) / theta)
     # When theta = 0, (sin(theta/2) / theta) is undefined
-    # However, as theta --> 0, we can use the Taylor approximation 1/2 - theta^2 / 48
+    # However, as theta --> 0, we can use the Taylor approximation 1/2 -
+    # theta^2 / 48
     quat = quat * (1.0 - 2.0 * (quat[..., 0:1] < 0.0))
     mag = np.linalg.norm(quat[..., 1:], dim=-1)
     half_angle = np.arctan2(mag, quat[..., 0])
@@ -58,10 +61,28 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
 
 
+def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
+
+    Args:
+        q: The quaternion in (w, x, y, z). Shape is (..., 4).
+        v: The vector in (x, y, z). Shape is (..., 3).
+
+    Returns:
+        The rotated vector in (x, y, z). Shape is (..., 3).
+    """
+    q_w = q[..., 0]
+    q_vec = q[..., 1:]
+    a = v * (2.0 * q_w**2 - 1.0).unsqueeze(-1)
+    b = np.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
+    c = q_vec * np.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
+    return a - b + c
+
+
 def body_pose_axa(
         tf_buffer,
-        frame:str,
-        ref_frame:str='pelvis',
+        frame: str,
+        ref_frame: str = 'pelvis',
         stamp=None):
     """ --> tf does not exist """
     if stamp is None:
@@ -69,8 +90,8 @@ def body_pose_axa(
     try:
         # t = "ref{=pelvis}_from_frame" transform
         t = tf_buffer.lookup_transform(
-            ref_frame, #to
-            frame, #from
+            ref_frame,  # to
+            frame,  # from
             stamp)
     except TransformException as ex:
         print(f'Could not transform {frame} to {ref_frame}: {ex}')
@@ -84,9 +105,10 @@ def body_pose_axa(
 
     xyz = np.array(xyz)
     axa = axis_angle_from_quat(quat_wxyz)
-    axa = (axa + np.pi) % (2*np.pi)
+    axa = (axa + np.pi) % (2 * np.pi)
 
     return (xyz, axa)
+
 
 def index_map(k_to, k_from):
     """
@@ -98,14 +120,15 @@ def index_map(k_to, k_from):
         out.append(k_from.index(k))
     return out
 
+
 class Observation:
-    def __init__(self, config, tf_buffer:Buffer):
+    def __init__(self, config, tf_buffer: Buffer):
         self.config = config
         self.num_lab_joint = len(config.lab_joint)
         self.tf_buffer = tf_buffer
         self.lab_from_mot = index_map(config.lab_joint,
                                       config.motor_joint)
-    
+
     def __call__(self,
                  low_state: LowStateHG,
                  last_action: np.ndarray,
@@ -117,50 +140,60 @@ class Observation:
 
         # NOTE(ycho): dummy value
         # base_lin_vel = np.zeros(3)
-        base_ang_vel = np.array([low_state.imu_state.gyroscope],
+        ang_vel = np.array([low_state.imu_state.gyroscope],
                                 dtype=np.float32)
-
         # FIXME(ycho): check if the convention "q_base^{-1} @ g" holds.
         quat = low_state.imu_state.quaternion
+        if self.config.imu_type == "torso":
+            waist_yaw = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
+            waist_yaw_omega = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
+            quat, ang_vel = transform_imu_data(
+                waist_yaw=waist_yaw,
+                waist_yaw_omega=waist_yaw_omega,
+                imu_quat=quat,
+                imu_omega=ang_vel)
+        base_ang_vel = ang_vel
+
         projected_gravity = get_gravity_orientation(quat)
 
-        fp_l = body_pose_axa(self.tf_buffer,'left_ankle_roll_link')
-        fp_r = body_pose_axa(self.tf_buffer,'right_ankle_roll_link')
+        fp_l = body_pose_axa(self.tf_buffer, 'left_ankle_roll_link')
+        fp_r = body_pose_axa(self.tf_buffer, 'right_ankle_roll_link')
         foot_pose = np.concatenate([fp_l[0], fp_r[0], fp_l[1], fp_r[1]])
 
-        hp_l = body_pose_axa(self.tf_buffer,'left_hand_palm_link')
-        hp_r = body_pose_axa(self.tf_buffer,'right_hand_palm_link')
+        hp_l = body_pose_axa(self.tf_buffer, 'left_hand_palm_link')
+        hp_r = body_pose_axa(self.tf_buffer, 'right_hand_palm_link')
         hand_pose = np.concatenate([hp_l[0], hp_r[0], hp_l[1], hp_r[1]])
 
-        projected_com = quat_rotate(
-            quat_conjugate(quat), (com_pos - root_pos)
+        projected_com = quat_rotate_inverse(
+            quat, com_pos_wrt_pelvis
         )
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
         joint_pos = np.zeros(num_lab_joint,
-                            dtype=np.float32)
+                             dtype=np.float32)
         joint_vel = np.zeros(num_lab_joint,
-                            dtype=np.float32)
+                             dtype=np.float32)
         joint_pos[lab_from_mot] = [low_state.motor_state[i_mot].q for i_mot in
-                                range(len(lab_from_mot))]
+                                   range(len(lab_from_mot))]
+        joint_pos -= config.lab_joint_offsets
         joint_vel[lab_from_mot] = [low_state.motor_state[i_mot].dq for i_mot in
-                                range(len(lab_from_mot))]
+                                   range(len(lab_from_mot))]
         actions = last_action
 
         hands_command = hands_command
         right_arm_com = _
         left_arm_com = _
 
-        if True: # hack 
+        if True:  # hack
             lf_from_pelvis = self.tf_buffer.lookup_transform(
-                'left_ankle_roll_link', #to
-                'pelvis'
+                'left_ankle_roll_link',  # to
+                'pelvis',
                 stamp=rp.time.Time()
             )
             rf_from_pelvis = self.tf_buffer.lookup_transform(
-                'right_ankle_roll_link', #to
-                'pelvis'
+                'right_ankle_roll_link',  # to
+                'pelvis',
                 stamp=rp.time.Time()
             )
             # NOTE(ycho): we assume at least one of the feet is on the ground
@@ -170,9 +203,9 @@ class Observation:
             pelvis_height = [pelvis_height]
         else:
             pelvis_height = np.abs(np.dot(
-                projected_gravity, # world frame
+                projected_gravity,  # world frame
                 fp_l[0]
-                )
+            )
             )
         return np.concatenate([
             base_ang_vel,
@@ -188,7 +221,6 @@ class Observation:
             left_arm_com,
             pelvis_height
         ], axis=-1)
-
 
 
 class Controller:
@@ -209,6 +241,7 @@ class Controller:
 
         rp.init()
         self._node = rp.create_node("low_level_cmd_sender")
+        self.obsmap = Observation(config, self.tf_buffer)
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -217,9 +250,9 @@ class Controller:
             self.low_state = LowStateHG()
 
             self.lowcmd_publisher_ = self._node.create_publisher(LowCmdHG,
-                                'lowcmd', 10)
-            self.lowstate_subscriber = self._node.create_subscription(LowStateHG,
-                                'lowstate', self.LowStateHgHandler, 10)
+                                                                 'lowcmd', 10)
+            self.lowstate_subscriber = self._node.create_subscription(
+                LowStateHG, 'lowstate', self.LowStateHgHandler, 10)
             self.mode_pr_ = MotorMode.PR
             self.mode_machine_ = 0
 
@@ -246,7 +279,8 @@ class Controller:
 
         self.mode = Mode.wait
         self._mode_change = True
-        self._timer = self._node.create_timer(self.config.control_dt, self.run_wrapper)
+        self._timer = self._node.create_timer(
+            self.config.control_dt, self.run_wrapper)
         self._terminate = False
         try:
             rp.spin(self._node)
@@ -275,7 +309,7 @@ class Controller:
         size = len(cmd.motor_cmd)
         # print(cmd.mode_machine)
         # for i in range(size):
-        #     print(i, cmd.motor_cmd[i].q, 
+        #     print(i, cmd.motor_cmd[i].q,
         #         cmd.motor_cmd[i].dq,
         #         cmd.motor_cmd[i].kp,
         #         cmd.motor_cmd[i].kd,
@@ -301,19 +335,20 @@ class Controller:
         total_time = 2
         self.counter = 0
         self._num_step = int(total_time / self.config.control_dt)
-        
+
         dof_idx = self.config.leg_joint2motor_idx + self.config.arm_waist_joint2motor_idx
         kps = self.config.kps + self.config.arm_waist_kps
         kds = self.config.kds + self.config.arm_waist_kds
         self._kps = [float(kp) for kp in kps]
         self._kds = [float(kd) for kd in kds]
-        self._default_pos = np.concatenate((self.config.default_angles, self.config.arm_waist_target), axis=0)
+        self._default_pos = np.concatenate(
+            (self.config.default_angles, self.config.arm_waist_target), axis=0)
         self._dof_size = len(dof_idx)
         self._dof_idx = dof_idx
-        
+
         # record the current pos
         self._init_dof_pos = np.zeros(self._dof_size,
-                                dtype=np.float32)
+                                      dtype=np.float32)
         for i in range(self._dof_size):
             self._init_dof_pos[i] = self.low_state.motor_state[dof_idx[i]].q
 
@@ -324,8 +359,8 @@ class Controller:
             for j in range(self._dof_size):
                 motor_idx = self._dof_idx[j]
                 target_pos = self._default_pos[j]
-                self.low_cmd.motor_cmd[motor_idx].q = (self._init_dof_pos[j] * 
-                                                        (1 - alpha) + target_pos * alpha)
+                self.low_cmd.motor_cmd[motor_idx].q = (
+                    self._init_dof_pos[j] * (1 - alpha) + target_pos * alpha)
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
                 self.low_cmd.motor_cmd[motor_idx].kp = self._kps[j]
                 self.low_cmd.motor_cmd[motor_idx].kd = self._kds[j]
@@ -340,14 +375,16 @@ class Controller:
         if self.remote_controller.button[KeyMap.A] != 1:
             for i in range(len(self.config.leg_joint2motor_idx)):
                 motor_idx = self.config.leg_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = float(self.config.default_angles[i])
+                self.low_cmd.motor_cmd[motor_idx].q = float(
+                    self.config.default_angles[i])
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
                 self.low_cmd.motor_cmd[motor_idx].kp = self._kps[i]
                 self.low_cmd.motor_cmd[motor_idx].kd = self._kds[i]
                 self.low_cmd.motor_cmd[motor_idx].tau = 0.0
             for i in range(len(self.config.arm_waist_joint2motor_idx)):
                 motor_idx = self.config.arm_waist_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = float(self.config.arm_waist_target[i])
+                self.low_cmd.motor_cmd[motor_idx].q = float(
+                    self.config.arm_waist_target[i])
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
                 self.low_cmd.motor_cmd[motor_idx].kp = self._kps[i]
                 self.low_cmd.motor_cmd[motor_idx].kd = self._kds[i]
@@ -363,27 +400,17 @@ class Controller:
             self.mode = Mode.null
             return
         self.counter += 1
-        # Get the current joint position and velocity
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            self.qj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].q
-            self.dqj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].dq
 
-        # imu_state quaternion: w, x, y, z
-        quat = self.low_state.imu_state.quaternion
-        ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
-
-        if self.config.imu_type == "torso":
-            # h1 and h1_2 imu is on the torso
-            # imu data needs to be transformed to the pelvis frame
-            waist_yaw = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
-            waist_yaw_omega = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
-            quat, ang_vel = transform_imu_data(waist_yaw=waist_yaw, waist_yaw_omega=waist_yaw_omega, imu_quat=quat, imu_omega=ang_vel)
+        obs = self.obsmap(self.low_state,
+                          self.last_action,
+                          hands_command)
 
         # create observation
         gravity_orientation = get_gravity_orientation(quat)
         qj_obs = self.qj.copy()
         dqj_obs = self.dqj.copy()
-        qj_obs = (qj_obs - self.config.default_angles) * self.config.dof_pos_scale
+        qj_obs = (
+            qj_obs - self.config.default_angles) * self.config.dof_pos_scale
         dqj_obs = dqj_obs * self.config.dof_vel_scale
         ang_vel = ang_vel * self.config.ang_vel_scale
         period = 0.8
@@ -406,16 +433,16 @@ class Controller:
         self.obs[:3] = ang_vel
         self.obs[3:6] = gravity_orientation
         self.obs[6:9] = self.cmd * self.config.cmd_scale * self.config.max_cmd
-        self.obs[9 : 9 + num_actions] = qj_obs
-        self.obs[9 + num_actions : 9 + num_actions * 2] = dqj_obs
-        self.obs[9 + num_actions * 2 : 9 + num_actions * 3] = self.action
+        self.obs[9: 9 + num_actions] = qj_obs
+        self.obs[9 + num_actions: 9 + num_actions * 2] = dqj_obs
+        self.obs[9 + num_actions * 2: 9 + num_actions * 3] = self.action
         self.obs[9 + num_actions * 3] = sin_phase
         self.obs[9 + num_actions * 3 + 1] = cos_phase
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
-        
+
         # transform action to target_dof_pos
         target_dof_pos = self.config.default_angles + self.action * self.config.action_scale
 
@@ -430,10 +457,13 @@ class Controller:
 
         for i in range(len(self.config.arm_waist_joint2motor_idx)):
             motor_idx = self.config.arm_waist_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = float(self.config.arm_waist_target[i])
+            self.low_cmd.motor_cmd[motor_idx].q = float(
+                self.config.arm_waist_target[i])
             self.low_cmd.motor_cmd[motor_idx].dq = 0.0
-            self.low_cmd.motor_cmd[motor_idx].kp = float(self.config.arm_waist_kps[i])
-            self.low_cmd.motor_cmd[motor_idx].kd = float(self.config.arm_waist_kds[i])
+            self.low_cmd.motor_cmd[motor_idx].kp = float(
+                self.config.arm_waist_kps[i])
+            self.low_cmd.motor_cmd[motor_idx].kd = float(
+                self.config.arm_waist_kds[i])
             self.low_cmd.motor_cmd[motor_idx].tau = 0.0
 
         # send the command
@@ -457,7 +487,7 @@ class Controller:
             if self._mode_change:
                 print("Moving to default pos.")
                 self._mode_change = False
-                self.prepare_default_pos()                
+                self.prepare_default_pos()
             self.move_to_default_pos()
         elif self.mode == Mode.damping:
             if self._mode_change:
@@ -476,11 +506,16 @@ class Controller:
 
         # time.sleep(self.config.control_dt)
 
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("config", type=str, help="config file name in the configs folder", default="g1.yaml")
+    parser.add_argument(
+        "config",
+        type=str,
+        help="config file name in the configs folder",
+        default="g1.yaml")
     args = parser.parse_args()
 
     # Load config
