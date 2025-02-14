@@ -25,7 +25,7 @@ class Mode(Enum):
     policy = 4
     null = 5
        
-def axis_angle_from_quat(quat: torch.Tensor, eps: float = 1.0e-6) -> torch.Tensor:
+def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     """Convert rotations given as quaternions to axis/angle.
 
     Args:
@@ -88,19 +88,31 @@ def body_pose_axa(
 
     return (xyz, axa)
 
+def index_map(k_to, k_from):
+    """
+    returns an index mapping from k_from to k_to;
+    i.e. k_to[index_map] = k_from
+    """
+    out = []
+    for k in k_to:
+        out.append(k_from.index(k))
+    return out
 
 class Observation:
-    def __init__(self, tf_buffer:Buffer):
+    def __init__(self, config, tf_buffer:Buffer):
+        self.config = config
+        self.num_lab_joint = len(config.lab_joint)
         self.tf_buffer = tf_buffer
-
+        self.lab_from_mot = index_map(config.lab_joint,
+                                      config.motor_joint)
     
     def __call__(self,
                  low_state: LowStateHG,
-                 last_action: np.ndarray
+                 last_action: np.ndarray,
+                 hands_command: np.ndarray
                  ):
         lab_from_mot = self.lab_from_mot
-        # 15+0(??)+7
-        num_lab_actions = 22
+        num_lab_joint = self.num_lab_joint
         # observation terms (order preserved)
 
         # NOTE(ycho): dummy value
@@ -126,9 +138,9 @@ class Observation:
         # projected_zmp = _ # IMPOSSIBLE
 
         # Map `low_state` to index-mapped joint_{pos,vel}
-        joint_pos = np.zeros(num_lab_actions,
+        joint_pos = np.zeros(num_lab_joint,
                             dtype=np.float32)
-        joint_vel = np.zeros(num_lab_actions,
+        joint_vel = np.zeros(num_lab_joint,
                             dtype=np.float32)
         joint_pos[lab_from_mot] = [low_state.motor_state[i_mot].q for i_mot in
                                 range(len(lab_from_mot))]
@@ -136,10 +148,46 @@ class Observation:
                                 range(len(lab_from_mot))]
         actions = last_action
 
-        hands_command = _ # goal
+        hands_command = hands_command
         right_arm_com = _
         left_arm_com = _
-        pelvis_height = _
+
+        if True: # hack 
+            lf_from_pelvis = self.tf_buffer.lookup_transform(
+                'left_ankle_roll_link', #to
+                'pelvis'
+                stamp=rp.time.Time()
+            )
+            rf_from_pelvis = self.tf_buffer.lookup_transform(
+                'right_ankle_roll_link', #to
+                'pelvis'
+                stamp=rp.time.Time()
+            )
+            # NOTE(ycho): we assume at least one of the feet is on the ground
+            #            and use the higher of the two as the pelvis height.
+            pelvis_height = max(lf_from_pelvis.transform.translation.z,
+                                rf_from_pelvis.transform.translation.z)
+            pelvis_height = [pelvis_height]
+        else:
+            pelvis_height = np.abs(np.dot(
+                projected_gravity, # world frame
+                fp_l[0]
+                )
+            )
+        return np.concatenate([
+            base_ang_vel,
+            projected_gravity,
+            foot_pose,
+            hand_pose,
+            projected_com,
+            joint_pos,
+            joint_vel,
+            actions,
+            hands_command,
+            right_arm_com,
+            left_arm_com,
+            pelvis_height
+        ], axis=-1)
 
 
 
