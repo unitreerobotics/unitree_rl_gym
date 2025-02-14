@@ -24,7 +24,40 @@ class Mode(Enum):
     damping = 3
     policy = 4
     null = 5
-        
+       
+def axis_angle_from_quat(quat: torch.Tensor, eps: float = 1.0e-6) -> torch.Tensor:
+    """Convert rotations given as quaternions to axis/angle.
+
+    Args:
+        quat: The quaternion orientation in (w, x, y, z). Shape is (..., 4).
+        eps: The tolerance for Taylor approximation. Defaults to 1.0e-6.
+
+    Returns:
+        Rotations given as a vector in axis angle form. Shape is (..., 3).
+        The vector's magnitude is the angle turned anti-clockwise in radians around the vector's direction.
+
+    Reference:
+        https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py#L526-L554
+    """
+    # Modified to take in quat as [q_w, q_x, q_y, q_z]
+    # Quaternion is [q_w, q_x, q_y, q_z] = [cos(theta/2), n_x * sin(theta/2), n_y * sin(theta/2), n_z * sin(theta/2)]
+    # Axis-angle is [a_x, a_y, a_z] = [theta * n_x, theta * n_y, theta * n_z]
+    # Thus, axis-angle is [q_x, q_y, q_z] / (sin(theta/2) / theta)
+    # When theta = 0, (sin(theta/2) / theta) is undefined
+    # However, as theta --> 0, we can use the Taylor approximation 1/2 - theta^2 / 48
+    quat = quat * (1.0 - 2.0 * (quat[..., 0:1] < 0.0))
+    mag = np.linalg.norm(quat[..., 1:], dim=-1)
+    half_angle = np.arctan2(mag, quat[..., 0])
+    angle = 2.0 * half_angle
+    # check whether to apply Taylor approximation
+    sin_half_angles_over_angles = np.where(
+        angle.abs() > eps,
+        np.sin(half_angle) / angle,
+        0.5 - angle * angle / 48
+    )
+    return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
+
+
 def body_pose_axa(
         tf_buffer,
         frame:str,
@@ -32,7 +65,7 @@ def body_pose_axa(
         stamp=None):
     """ --> tf does not exist """
     if stamp is None:
-        stamp = rclpy.time.Time()
+        stamp = rp.time.Time()
     try:
         # t = "ref{=pelvis}_from_frame" transform
         t = tf_buffer.lookup_transform(
@@ -50,7 +83,8 @@ def body_pose_axa(
     quat_wxyz = [rxn.w, rxn.x, rxn.y, rxn.z]
 
     xyz = np.array(xyz)
-    axa = axa_from_quat(quat_wxyz)
+    axa = axis_angle_from_quat(quat_wxyz)
+    axa = (axa + np.pi) % (2*np.pi)
 
     return (xyz, axa)
 
