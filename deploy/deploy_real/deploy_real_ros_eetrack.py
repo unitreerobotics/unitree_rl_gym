@@ -21,6 +21,9 @@ from ikctrl import IKCtrl, xyzw2wxyz
 from yourdfpy import URDF
 
 
+from math_utils import *
+import random as rd
+
 class Mode(Enum):
     wait = 0
     zero_torque = 1
@@ -187,6 +190,109 @@ def index_map(k_to, k_from):
     return out
 
 
+def interpolate_position(pos1, pos2, n_segments):
+    increments = (pos2 - pos1) / n_segments
+    interp_pos = [pos1 + increments * p for p in range(n_segments)]
+    interp_pos.append(pos2)
+    return interp_pos
+
+class eetrack:
+    def __init__(self, root_state_w):
+        self.eetrack_midpt = root_state_w.clone()
+        self.eetrack_midpt[1] += 0.3
+        self.eetrack_end = None
+        self.eetrack_subgoal = None
+        self.number_of_subgoals = 30
+        self.eetrack_line_length = 0.3
+        self.device = "cuda"
+        self.create_eetrack()
+        self.eetrack_subgoal = self.create_subgoal()
+        self.sg_idx = 0
+        self.init_time = rp.time.Time() + 1.0 # first subgoal sampling time = 1.0s
+
+    def create_eetrack(self):
+        self.eetrack_start = self.eetrack_midpt.clone() 
+        self.eetrack_end = self.eetrack_midpt.clone() 
+        is_hor = rd.choice([True, False])
+        eetrack_offset = rd.uniform(-0.5, 0.5)
+        # For testing
+        is_hor = True
+        eetrack_offset = 0.0
+        if is_hor:
+            self.eetrack_start[2] += eetrack_offset
+            self.eetrack_end[2] += eetrack_offset
+            self.eetrack_start[0] -= (self.eetrack_line_length) / 2.
+            self.eetrack_end[0] += (self.eetrack_line_length) / 2.
+        else:
+            self.eetrack_start[0] += eetrack_offset
+            self.eetrack_end[0] += eetrack_offset
+            self.eetrack_start[2] += (self.eetrack_line_length) / 2.
+            self.eetrack_end[2] -= (self.eetrack_line_length) / 2.
+        return self.eetrack_start, self.eetrack_end
+
+    def create_direction(self):
+        angle_from_eetrack_line = torch.rand(1, device=self.device) * np.pi
+        angle_from_xyplane_in_global_frame  = torch.rand(1, device=self.device) * np.pi - np.pi/2
+        # For testing
+        angle_from_eetrack_line = torch.rand(1, device=self.device) * np.pi/2
+        angle_from_xyplane_in_global_frame  = torch.rand(1, device=self.device) * 0
+        roll = torch.zeros(1, device=self.device)
+        pitch = angle_from_xyplane_in_global_frame 
+        yaw = angle_from_eetrack_line
+        euler = torch.stack([roll, pitch, yaw], dim=1)
+        quat = math_utils.quat_from_euler_xyz(euler[:,0], euler[:,1], euler[:,2])
+        return quat
+        
+    def create_subgoal(self):
+        eetrack_subgoals = interpolate_position(self.eetrack_start, self.eetrack_end, self.number_of_subgoals)
+        eetrack_subgoals = [
+            (
+                l.clone().to(self.device, dtype=torch.float32)
+                if isinstance(l, torch.Tensor) 
+                else torch.tensor(l, device=self.device, dtype=torch.float32)
+            )
+            for l in eetrack_subgoals
+        ]
+        eetrack_subgoals = torch.stack(eetrack_subgoals,axis=1)
+        eetrack_ori = self.create_direction().unsqueeze(1).repeat(1, self.number_of_subgoals + 1, 1)
+        # welidng_subgoals -> Nenv x Npoints x (3 + 4)
+        return torch.cat([eetrack_subgoals, eetrack_ori], dim=2)
+
+    def update_command(self):
+        time = self.init_time - rp.time.Time()
+        if (time>=0):
+            self.sg_idx = time / 0.1 + 1
+        self.sg_idx.clamp_(0, self.number_of_subgoals + 1)
+        self.next_command_s_left = self.eetrack_subgoal[self.sg_idx]
+
+    def get_command(self, root_state_w):
+        self.update_command()
+
+        pos_hand_b_left, quat_hand_b_left = body_pose_axa("left_hand_palm_link")
+
+        lerp_command_w_left = self.next_command_s_left
+
+        # lerp_command_b_left = math_utils.subtract_frame_transforms(
+        #     root_state_w[..., 0:3],
+        #     root_state_w[..., 3:7],
+        #     lerp_command_w_left[:, 0:3],
+        #     lerp_command_w_left[:, 3:7],
+        # )
+
+        lerp_command_b_left = lerp_command_w_left
+
+        pos_delta_b_left, rot_delta_b_left = math_utils.compute_pose_error(
+            pos_hand_b_left,
+            quat_hand_b_left,
+            lerp_command_b_left[:, :3],
+            lerp_command_b_left[:, 3:],
+        )
+        axa_delta_b_left = math_utils.wrap_to_pi(rot_delta_b_left)
+
+        hand_command = torch.cat((pos_delta_b_left, axa_delta_b_left), dim=-1)
+        return hand_command
+
+
 class Observation:
     def __init__(self,
                  urdf_path: str,
@@ -198,6 +304,9 @@ class Observation:
         self.tf_buffer = tf_buffer
         self.lab_from_mot = index_map(config.lab_joint,
                                       config.motor_joint)
+        # initial state of root
+        # FIXME(ycho): implement
+        self.eetrack = eetrack(root_state_w= ... ) 
 
     def __call__(self,
                  low_state: LowStateHG,
@@ -251,7 +360,7 @@ class Observation:
         actions = last_action
 
         # Given as delta_pos {xyz,axa}; i.e. 6D vector
-        hands_command = hands_command
+        hands_command = self.eetrack.get_command()
 
         right_arm_com = compute_com([
             "right_shoulder_pitch_link",
