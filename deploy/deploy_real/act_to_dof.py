@@ -19,7 +19,7 @@ class ActToDof:
         left_arm_residual = action[..., 22:29]
 
         q_pin = np.zeros_like(self.ikctrl.cfg.q)
-        for i_mot in range(len(self.config.motor_joint)):
+        for i_mot in range(len(self.config['motor_joint'])):
             i_pin = self.pin_from_mot[i_mot]
             q_pin[i_pin] = self.low_state.motor_state[i_mot].q
 
