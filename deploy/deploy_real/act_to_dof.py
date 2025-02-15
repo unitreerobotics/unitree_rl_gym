@@ -20,6 +20,10 @@ class ActToDof:
             self.ikctrl.joint_names,
             self.config.motor_joint
         )
+        self.pin_from_lab = index_map(
+            self.ikctrl.joint_names,
+            self.config.lab_joint
+        )
         self.mot_from_arm = index_map(
             self.config.motor_joint,
             self.config.arm_joint
