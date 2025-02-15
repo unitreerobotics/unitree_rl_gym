@@ -9,7 +9,7 @@ lowstate_topic: "rt/lowstate"
 
 policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/policy.pt"
 
-act_joint: [
+arm_joint: [
   "left_shoulder_pitch_joint",
   "left_shoulder_roll_joint",
   "left_shoulder_yaw_joint",

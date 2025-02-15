@@ -61,9 +61,12 @@ class ActToDof:
         q_lab = obs[..., 32:61]
         q_pin = np.zeros_like(self.ikctrl.cfg.q)
         q_pin[self.pin_from_lab] = q_lab
+        q_pin[self.pin_from_lab] += np.asarray(self.config.lab_joint_offsets)
 
         q_mot = np.zeros(29)
         q_mot[self.mot_from_lab] = q_lab
+        q_mot[self.mot_from_lab] += np.asarray(self.config.lab_joint_offsets)
+        #print('q_mot (inside)', q_mot)
 
         # print('q0', q_mot[self.mot_from_arm])
         # q_mot[i_mot] = q_lab[ lab_from_mot[i_mot] ]
@@ -71,6 +74,7 @@ class ActToDof:
         d_quat = quat_from_angle_axis(
             torch.from_numpy(hands_command[..., 3:])
         ).detach().cpu().numpy()
+        # print('d_quat', d_quat)
 
         source_pose = self.ikctrl.fk(q_pin)
         source_xyz = source_pose.translation
@@ -81,11 +85,13 @@ class ActToDof:
             torch.from_numpy(d_quat),
             torch.from_numpy(source_quat)).detach().cpu().numpy()
         target = np.concatenate([target_xyz, target_quat])
-
+        # print('target', target)
+        # print('q_pin', q_pin)
         res_q_ik = self.ikctrl(
             q_pin,
             target
         )
+        # print('res_q_ik', res_q_ik)
 
         # q_pin2 = np.copy(q_pin)
         # q_pin2[self.pin_from_arm] += res_q_ik
@@ -102,22 +108,24 @@ class ActToDof:
         target_dof_pos = np.zeros(29)
         target_dof_pos += q_mot
         target_dof_pos[self.mot_from_arm] += res_q_ik
-        target_dof_pos[self.mot_from_arm] += np.clip(
-                0.3 * left_arm_residual,
-                -0.2, 0.2)
 
-        # print('default joint pos', self.default_nonarm)
-        # print('joint order', self.config.non_arm_joint)
-        # print('mot_from_nonarm', self.mot_from_nonarm)
-        target_dof_pos[self.mot_from_nonarm] = (
-            self.default_nonarm + 0.5 * non_arm_joint_pos
-        )
+        if True:
+            target_dof_pos[self.mot_from_arm] += np.clip(
+                    0.3 * left_arm_residual,
+                    -0.2, 0.2)
 
-        target_dof_pos[self.mot_from_arm] = np.clip(
-                target_dof_pos[self.mot_from_arm],
-                self.lim_lo_pin[self.pin_from_arm],
-                self.lim_hi_pin[self.pin_from_arm]
-        )
+            # print('default joint pos', self.default_nonarm)
+            # print('joint order', self.config.non_arm_joint)
+            # print('mot_from_nonarm', self.mot_from_nonarm)
+            target_dof_pos[self.mot_from_nonarm] = (
+                self.default_nonarm + 0.5 * non_arm_joint_pos
+            )
+
+            target_dof_pos[self.mot_from_arm] = np.clip(
+                    target_dof_pos[self.mot_from_arm],
+                    self.lim_lo_pin[self.pin_from_arm],
+                    self.lim_hi_pin[self.pin_from_arm]
+            )
 
         return target_dof_pos
 

@@ -3,6 +3,7 @@ from typing import Union, List
 import numpy as np
 import time
 import torch
+import torch as th
 from pathlib import Path
 
 import rclpy as rp
@@ -70,6 +71,10 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     )
     return quat[..., 1:4] / sin_half_angles_over_angles[..., None]
 
+def quat_conjugate(q):
+    return np.concatenate(
+            (q[..., 0:1], -q[..., 1:]),
+            axis=-1)
 
 def quat_from_angle_axis(
         angle: torch.Tensor,
@@ -486,7 +491,7 @@ class Observation:
             hand_pose,
             projected_com,
             joint_pos,
-            joint_vel,
+            0.0*joint_vel,
             actions,
             hands_command,
             right_arm_com,
@@ -551,6 +556,17 @@ class Controller:
         # FIXME(ycho): give `root_state_w`
         self.eetrack = None
 
+        if True:
+            q_mot = np.array(config.default_angles)
+            q_pin = np.zeros_like(self.ikctrl.cfg.q)
+            q_pin[self.pin_from_mot] = q_mot
+            default_pose = self.ikctrl.fk(q_pin)
+            xyz = default_pose.translation
+            quat_wxyz = xyzw2wxyz(pin.Quaternion(default_pose.rotation).coeffs())
+            self.default_pose = np.concatenate([xyz, quat_wxyz])
+            self.target_pose = np.copy(self.default_pose)
+            print('default_pose', self.default_pose)
+
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
 
@@ -579,7 +595,7 @@ class Controller:
         elif config.msg_type == "go":
             init_cmd_go(self.low_cmd, weak_motor=self.config.weak_motor)
 
-        self.mode = Mode.policy
+        self.mode = Mode.wait
         self._mode_change = True
         self._timer = self._node.create_timer(
             self.config.control_dt, self.run_wrapper)
@@ -708,6 +724,9 @@ class Controller:
         self.cmd[1] = self.remote_controller.lx * -1
         self.cmd[2] = self.remote_controller.rx * -1
 
+        if True:
+            self.target_pose[..., :3] += 0.01 * self.cmd
+
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
 
@@ -734,8 +753,36 @@ class Controller:
             self.eetrack = eetrack(torch.from_numpy(root_state_w)[None],
                     self.tf_buffer)
 
-        _hands_command_ = self.eetrack.get_command(
-                torch.from_numpy(root_state_w)[None])[0].detach().cpu().numpy()
+        if False:
+            _hands_command_ = self.eetrack.get_command(
+                    torch.from_numpy(root_state_w)[None])[0].detach().cpu().numpy()
+        else:
+            _hands_command_ = np.zeros(6)
+            #_hands_command_[0] = self.cmd[0] * 0.03
+            #_hands_command_[2] = self.cmd[1] * 0.03
+            if True:
+                q_mot = [self.low_state.motor_state[i_mot].q for i_mot in range(29)]
+                # print('q_mot (out)', q_mot)
+                q_pin = np.zeros_like(self.ikctrl.cfg.q)
+                q_pin[self.pin_from_mot] = q_mot
+
+                current_pose = self.ikctrl.fk(q_pin)
+                _hands_command_ =  np.zeros(6)
+                _hands_command_[0:3] = (self.target_pose[:3]
+                        - current_pose.translation)
+
+                quat_wxyz = xyzw2wxyz(pin.Quaternion(
+                    current_pose.rotation).coeffs())
+                # q_target @ q_current^{-1}
+                d_quat = quat_mul(
+                        torch.from_numpy(self.target_pose[3:7]),
+                        torch.from_numpy(quat_conjugate(quat_wxyz))
+                ).detach().cpu().numpy()
+                d_axa = axis_angle_from_quat(d_quat)
+                _hands_command_[3:6] = d_axa
+                # bprint('hands_command', _hands_command_)
+                
+
         # print(_hands_command_)
         # _hands_command_ = np.zeros(6)
         # _hands_command_[0] = self.cmd[0] * 0.03
@@ -751,12 +798,31 @@ class Controller:
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
+        obs_tensor = obs_tensor.detach().clone()
+
+        # hands_command = obs[..., 119:125]
+        world_from_body_quat = math_utils.quat_from_euler_xyz(
+                th.as_tensor([0], dtype=th.float32),
+                th.as_tensor([0], dtype=th.float32),
+                th.as_tensor([1.57], dtype=th.float32)).reshape(4)
+        obs_tensor[..., 119:122] = math_utils.quat_rotate(
+                world_from_body_quat[None],
+                obs_tensor[..., 119:122])
+        obs_tensor[..., 122:125] = math_utils.quat_rotate(
+                world_from_body_quat[None],
+                obs_tensor[..., 122:125])
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
         # np.save(F'{logpath}/act{self.counter:03d}.npy',
         #         self.action)
 
-        target_dof_pos = self.actmap(self.obs,
-                self.action)
+        target_dof_pos = self.actmap(
+                self.obs,
+                self.action
+        )
+        # print('??',
+        #         target_dof_pos,
+        #         [self.low_state.motor_state[i_mot].q for i_mot in range(29)])
+
         # np.save(F'{logpath}/dof{self.counter:03d}.npy',
         #         target_dof_pos)
 

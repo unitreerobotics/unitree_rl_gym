@@ -30,7 +30,7 @@ class Controller:
         self.config = config
         self.remote_controller = RemoteController()
 
-        act_joint = config.act_joint
+        act_joint = config.arm_joint
         self.ikctrl = IKCtrl('../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
                              act_joint)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
@@ -175,20 +175,23 @@ class Controller:
         self._dof_idx = dof_idx
         
         # record the current pos
-        self._init_dof_pos = np.zeros(self._dof_size,
-                                dtype=np.float32)
-        for i in range(self._dof_size):
-            self._init_dof_pos[i] = self.low_state.motor_state[dof_idx[i]].q
+        self._init_dof_pos = np.zeros(29)
+        for i in range(29):
+            self._init_dof_pos[i] = self.low_state.motor_state[i].q
 
     def move_to_default_pos(self):
         # move to default pos
         if self.counter < self._num_step:
             alpha = self.counter / self._num_step
-            for j in range(self._dof_size):
-                motor_idx = self._dof_idx[j]
-                target_pos = self._default_pos[j]
-                self.low_cmd.motor_cmd[motor_idx].q = (self._init_dof_pos[j] * 
-                                                        (1 - alpha) + target_pos * alpha)
+            #for j in range(self._dof_size):
+            for j in range(29):
+                # motor_idx = self._dof_idx[j]
+                # target_pos = self._default_pos[j]
+                motor_idx = j
+                target_pos = self.config.default_angles[j]
+
+                self.low_cmd.motor_cmd[motor_idx].q = (
+                    self._init_dof_pos[j] * (1 - alpha) + target_pos * alpha)
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
                 self.low_cmd.motor_cmd[motor_idx].kp = self._kps[j]
                 self.low_cmd.motor_cmd[motor_idx].kd = self._kds[j]
