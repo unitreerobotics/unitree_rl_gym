@@ -267,16 +267,16 @@ class eetrack:
     def __init__(self, root_state_w, tf_buffer):
         self.tf_buffer = tf_buffer
         self.eetrack_midpt = root_state_w.clone()
-        self.eetrack_midpt[1] += 0.3
+        self.eetrack_midpt[..., 1] += 0.3
         self.eetrack_end = None
         self.eetrack_subgoal = None
         self.number_of_subgoals = 30
         self.eetrack_line_length = 0.3
-        self.device = "cuda"
+        self.device = "cpu"
         self.create_eetrack()
         self.eetrack_subgoal = self.create_subgoal()
         self.sg_idx = 0
-        self.init_time = rp.time.Time() + 1.0  # first subgoal sampling time = 1.0s
+        self.init_time = rp.time.Time().nanoseconds/1e9 + 1.0  # first subgoal sampling time = 1.0s
 
     def create_eetrack(self):
         self.eetrack_start = self.eetrack_midpt.clone()
@@ -287,15 +287,15 @@ class eetrack:
         is_hor = True
         eetrack_offset = 0.0
         if is_hor:
-            self.eetrack_start[2] += eetrack_offset
-            self.eetrack_end[2] += eetrack_offset
-            self.eetrack_start[0] -= (self.eetrack_line_length) / 2.
-            self.eetrack_end[0] += (self.eetrack_line_length) / 2.
+            self.eetrack_start[..., 2] += eetrack_offset
+            self.eetrack_end[..., 2] += eetrack_offset
+            self.eetrack_start[..., 0] -= (self.eetrack_line_length) / 2.
+            self.eetrack_end[..., 0] += (self.eetrack_line_length) / 2.
         else:
-            self.eetrack_start[0] += eetrack_offset
-            self.eetrack_end[0] += eetrack_offset
-            self.eetrack_start[2] += (self.eetrack_line_length) / 2.
-            self.eetrack_end[2] -= (self.eetrack_line_length) / 2.
+            self.eetrack_start[..., 0] += eetrack_offset
+            self.eetrack_end[..., 0] += eetrack_offset
+            self.eetrack_start[..., 2] += (self.eetrack_line_length) / 2.
+            self.eetrack_end[..., 2] -= (self.eetrack_line_length) / 2.
         return self.eetrack_start, self.eetrack_end
 
     def create_direction(self):
@@ -332,11 +332,13 @@ class eetrack:
         return torch.cat([eetrack_subgoals, eetrack_ori], dim=2)
 
     def update_command(self):
-        time = self.init_time - rp.time.Time()
+        time = self.init_time - rp.time.Time().nanoseconds/1e9
         if (time >= 0):
-            self.sg_idx = time / 0.1 + 1
-        self.sg_idx.clamp_(0, self.number_of_subgoals + 1)
-        self.next_command_s_left = self.eetrack_subgoal[self.sg_idx]
+            self.sg_idx = int( time / 0.1 + 1 )
+        # self.sg_idx.clamp_(0, self.number_of_subgoals + 1)
+        self.sg_idx = min(self.sg_idx, self.number_of_subgoals+1)
+        self.next_command_s_left = self.eetrack_subgoal[...,
+                self.sg_idx, :]
 
     def get_command(self, root_state_w):
         self.update_command()
@@ -349,7 +351,8 @@ class eetrack:
 
         lerp_command_w_left = self.next_command_s_left
 
-        lerp_command_b_left = math_utils.subtract_frame_transforms(
+        (lerp_command_b_left_pos,
+         lerp_command_b_left_quat) = math_utils.subtract_frame_transforms(
             root_state_w[..., 0:3],
             root_state_w[..., 3:7],
             lerp_command_w_left[:, 0:3],
@@ -359,10 +362,10 @@ class eetrack:
         # lerp_command_b_left = lerp_command_w_left
 
         pos_delta_b_left, rot_delta_b_left = math_utils.compute_pose_error(
-            pos_hand_b_left,
-            quat_hand_b_left,
-            lerp_command_b_left[:, :3],
-            lerp_command_b_left[:, 3:],
+            torch.from_numpy(pos_hand_b_left)[None],
+            torch.from_numpy(quat_hand_b_left)[None],
+            lerp_command_b_left_pos,
+            lerp_command_b_left_quat,
         )
         axa_delta_b_left = math_utils.wrap_to_pi(rot_delta_b_left)
 
@@ -576,7 +579,7 @@ class Controller:
         elif config.msg_type == "go":
             init_cmd_go(self.low_cmd, weak_motor=self.config.weak_motor)
 
-        self.mode = Mode.wait
+        self.mode = Mode.policy
         self._mode_change = True
         self._timer = self._node.create_timer(
             self.config.control_dt, self.run_wrapper)
@@ -707,6 +710,7 @@ class Controller:
 
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
+
         if True:
             root_state_w = np.zeros(7)
             lf_from_pelvis = self.tf_buffer.lookup_transform(
@@ -727,9 +731,12 @@ class Controller:
             root_state_w[3:7] = self.low_state.imu_state.quaternion
 
         if self.eetrack is None:
-            self.eetrack = eetrack(root_state_w,self.tf_buffer)
+            self.eetrack = eetrack(torch.from_numpy(root_state_w)[None],
+                    self.tf_buffer)
 
-        _hands_command_ = self.eetrack.get_command(root_state_w)
+        _hands_command_ = self.eetrack.get_command(
+                torch.from_numpy(root_state_w)[None])[0].detach().cpu().numpy()
+        # print(_hands_command_)
         # _hands_command_ = np.zeros(6)
         # _hands_command_[0] = self.cmd[0] * 0.03
         # _hands_command_[2] = self.cmd[1] * 0.03
