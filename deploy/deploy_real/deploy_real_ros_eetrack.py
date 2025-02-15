@@ -24,6 +24,7 @@ from yourdfpy import URDF
 
 from math_utils import *
 import random as rd
+from act_to_dof import ActToDof
 
 
 class Mode(Enum):
@@ -499,6 +500,7 @@ class Controller:
         self.ikctrl = IKCtrl(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config.arm_joint)
+        self.actmap = ActToDof(config, self.ikctrl)
         self.lim_lo_pin = self.ikctrl.robot.model.lowerPositionLimit
         self.lim_hi_pin = self.ikctrl.robot.model.upperPositionLimit
 
@@ -519,6 +521,11 @@ class Controller:
             self.config.motor_joint,
             self.config.non_arm_joint
         )
+        self.lab_from_mot = index_map(self.config.lab_joint,
+                                      self.config.motor_joint)
+        self.config.default_angles = np.asarray(self.config.lab_joint_offsets)[
+                self.lab_from_mot
+        ]
 
         # Data buffers
         self.obs = np.zeros(config.num_obs, dtype=np.float32)
@@ -627,18 +634,25 @@ class Controller:
         self._dof_idx = dof_idx
 
         # record the current pos
-        self._init_dof_pos = np.zeros(self._dof_size,
-                                      dtype=np.float32)
-        for i in range(self._dof_size):
-            self._init_dof_pos[i] = self.low_state.motor_state[dof_idx[i]].q
+        # self._init_dof_pos = np.zeros(self._dof_size,
+        #                               dtype=np.float32)
+        # for i in range(self._dof_size):
+        #     self._init_dof_pos[i] = self.low_state.motor_state[dof_idx[i]].q
+        self._init_dof_pos = np.zeros(29)
+        for i in range(29):
+            self._init_dof_pos[i] = self.low_state.motor_state[i].q
 
     def move_to_default_pos(self):
         # move to default pos
         if self.counter < self._num_step:
             alpha = self.counter / self._num_step
-            for j in range(self._dof_size):
-                motor_idx = self._dof_idx[j]
-                target_pos = self._default_pos[j]
+            #for j in range(self._dof_size):
+            for j in range(29):
+                # motor_idx = self._dof_idx[j]
+                # target_pos = self._default_pos[j]
+                motor_idx = j
+                target_pos = self.config.default_angles[j]
+
                 self.low_cmd.motor_cmd[motor_idx].q = (
                     self._init_dof_pos[j] * (1 - alpha) + target_pos * alpha)
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
@@ -682,79 +696,41 @@ class Controller:
         self.counter += 1
 
         # TODO(ycho): consider using `cmd` for `hands_command`
-        # self.cmd[0] = self.remote_controller.ly
-        # self.cmd[1] = self.remote_controller.lx * -1
-        # self.cmd[2] = self.remote_controller.rx * -1
+        self.cmd[0] = self.remote_controller.ly
+        self.cmd[1] = self.remote_controller.lx * -1
+        self.cmd[2] = self.remote_controller.rx * -1
 
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
         _hands_command_ = np.zeros(6)
+        _hands_command_[0] = self.cmd[0] * 0.03
+        _hands_command_[2] = self.cmd[1] * 0.03
 
         self.obs[:] = self.obsmap(self.low_state,
                                   self.action,
                                   _hands_command_)
-        Path('/tmp/eet/').mkdir(parents=True,
-                                exist_ok=True)
-        np.save(F'/tmp/eet/obs{self.counter:03d}.npy',
-                self.obs)
+        # logpath = Path('/tmp/eet3/')
+        # logpath.mkdir(parents=True, exist_ok=True)
+        # np.save(F'{logpath}/obs{self.counter:03d}.npy',
+        #         self.obs)
 
         # Get the action from the policy network
         obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
-        np.save(F'/tmp/eet/act{self.counter:03d}.npy',
+        # np.save(F'{logpath}/act{self.counter:03d}.npy',
+        #         self.action)
+
+        target_dof_pos = self.actmap(self.obs,
                 self.action)
-
-        non_arm_joint_pos = self.action[..., :22]
-        left_arm_residual = self.action[..., 22:29]
-
-        q_pin = np.zeros_like(self.ikctrl.cfg.q)
-        for i_mot in range(len(self.config.motor_joint)):
-            i_pin = self.pin_from_mot[i_mot]
-            q_pin[i_pin] = self.low_state.motor_state[i_mot].q
-
-        d_quat = quat_from_angle_axis(
-            torch.from_numpy(_hands_command_[..., 3:])
-        ).detach().cpu().numpy()
-
-        source_pose = self.ikctrl.fk(q_pin)
-        source_xyz = source_pose.translation
-        source_quat = xyzw2wxyz(pin.Quaternion(source_pose.rotation).coeffs())
-
-        target_xyz = source_xyz + _hands_command_[..., :3]
-        target_quat = quat_mul(
-            torch.from_numpy(d_quat),
-            torch.from_numpy(source_quat)).detach().cpu().numpy()
-        target = np.concatenate([target_xyz, target_quat])
-
-        res_q_ik = self.ikctrl(
-            q_pin,
-            target
-        )
-        print('res_q_ik', res_q_ik)
-
-        target_dof_pos = np.zeros(29)
-        for i_arm in range(len(res_q_ik)):
-            i_mot = self.mot_from_arm[i_arm]
-            i_pin = self.pin_from_mot[i_mot]
-            target_q = (
-                self.low_state.motor_state[i_mot].q
-                + res_q_ik[i_arm]
-                + np.clip(0.3 * left_arm_residual[i_arm],
-                          -0.2, 0.2)
-            )
-            target_q = np.clip(target_q,
-                               self.lim_lo_pin[i_pin],
-                               self.lim_hi_pin[i_pin])
-            target_dof_pos[i_mot] = target_q
-        np.save(F'/tmp/eet/dof{self.counter:03d}.npy',
-                target_dof_pos)
+        # np.save(F'{logpath}/dof{self.counter:03d}.npy',
+        #         target_dof_pos)
 
         # Build low cmd
         for i in range(len(self.config.motor_joint)):
             self.low_cmd.motor_cmd[i].q = float(target_dof_pos[i])
             self.low_cmd.motor_cmd[i].dq = 0.0
-            self.low_cmd.motor_cmd[i].kp = 0.0 * float(self.config.kps[i])
-            self.low_cmd.motor_cmd[i].kd = 0.0 * float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].kp = 0.05 * float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = 0.05 * float(self.config.kds[i])
             self.low_cmd.motor_cmd[i].tau = 0.0
 
         # send the command
