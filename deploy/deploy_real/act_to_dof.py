@@ -3,8 +3,15 @@ import torch
 import pinocchio as pin
 from common.np_math import (quat_from_angle_axis, quat_mul,
                             xyzw2wxyz, index_map)
+from ikctrl import IKCtrl
 
 class ActToDof:
+    def __init__(self, config):
+        self.ikctrl = IKCtrl(
+            '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
+            config['arm_joint']
+        )
+        
     def __call__(self, obs, action):
         hands_command = obs[..., 119:225]
         non_arm_joint_pos = action[..., :22]
@@ -57,7 +64,7 @@ def main():
     with open('configs/g1_eetrack.yaml', 'r') as fp:
         d = yaml.safe_load(fp)
 
-    act_to_dof = ActToDof()
+    act_to_dof = ActToDof(d)
     obs = np.load('/tmp/eet4/obs001.npy')[0]
     act = np.load('/tmp/eet4/act001.npy')[0]
     dof_lab = np.load('/tmp/eet4/dof001.npy')[0]
