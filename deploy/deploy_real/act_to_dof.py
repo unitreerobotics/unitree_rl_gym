@@ -24,6 +24,10 @@ class ActToDof:
             self.config.motor_joint,
             self.config.arm_joint
         )
+        self.mot_from_lab = index_map(
+            self.config.motor_joint,
+            self.config.lab_joint
+        )
         self.mot_from_nonarm = index_map(
             self.config.motor_joint,
             self.config.non_arm_joint
@@ -32,11 +36,13 @@ class ActToDof:
         hands_command = obs[..., 119:225]
         non_arm_joint_pos = action[..., :22]
         left_arm_residual = action[..., 22:29]
-
+        
+        q_lab = obs[..., 32:61]
         q_pin = np.zeros_like(self.ikctrl.cfg.q)
-        for i_mot in range(len(self.config.motor_joint)):
-            i_pin = self.pin_from_mot[i_mot]
-            q_pin[i_pin] = self.low_state.motor_state[i_mot].q
+        q_pin[self.pin_from_lab] = q_lab
+
+        q_mot = np.zeros(29)
+        q_mot[self.mot_from_lab] = q_lab
 
         d_quat = quat_from_angle_axis(
             torch.from_numpy(hands_command[..., 3:])
@@ -63,7 +69,7 @@ class ActToDof:
             i_mot = self.mot_from_arm[i_arm]
             i_pin = self.pin_from_mot[i_mot]
             target_q = (
-                self.low_state.motor_state[i_mot].q
+                q_mot[i_mot]
                 + res_q_ik[i_arm]
                 + np.clip(0.3 * left_arm_residual[i_arm],
                           -0.2, 0.2)
