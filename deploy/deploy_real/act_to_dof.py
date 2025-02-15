@@ -3,6 +3,7 @@ import torch
 import pinocchio as pin
 from common.np_math import (quat_from_angle_axis, quat_mul,
                             xyzw2wxyz, index_map)
+from config import Config
 from ikctrl import IKCtrl
 
 class ActToDof:
@@ -10,16 +11,30 @@ class ActToDof:
         self.config=config
         self.ikctrl = IKCtrl(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
-            config['arm_joint']
+            config.arm_joint
         )
-        
+        self.mot_from_pin = index_map(
+            self.config.motor_joint,
+            self.ikctrl.joint_names)
+        self.pin_from_mot = index_map(
+            self.ikctrl.joint_names,
+            self.config.motor_joint
+        )
+        self.mot_from_arm = index_map(
+            self.config.motor_joint,
+            self.config.arm_joint
+        )
+        self.mot_from_nonarm = index_map(
+            self.config.motor_joint,
+            self.config.non_arm_joint
+        )
     def __call__(self, obs, action):
         hands_command = obs[..., 119:225]
         non_arm_joint_pos = action[..., :22]
         left_arm_residual = action[..., 22:29]
 
         q_pin = np.zeros_like(self.ikctrl.cfg.q)
-        for i_mot in range(len(self.config['motor_joint'])):
+        for i_mot in range(len(self.config.motor_joint)):
             i_pin = self.pin_from_mot[i_mot]
             q_pin[i_pin] = self.low_state.motor_state[i_mot].q
 
@@ -65,7 +80,7 @@ def main():
     with open('configs/g1_eetrack.yaml', 'r') as fp:
         d = yaml.safe_load(fp)
 
-    act_to_dof = ActToDof(d)
+    act_to_dof = ActToDof(Config('configs/g1_eetrack.yaml'))
     obs = np.load('/tmp/eet4/obs001.npy')[0]
     act = np.load('/tmp/eet4/act001.npy')[0]
     dof_lab = np.load('/tmp/eet4/dof001.npy')[0]
