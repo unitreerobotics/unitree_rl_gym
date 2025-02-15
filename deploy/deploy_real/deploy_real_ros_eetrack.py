@@ -23,6 +23,7 @@ from yourdfpy import URDF
 
 
 from math_utils import *
+import math_utils
 import random as rd
 from act_to_dof import ActToDof
 
@@ -263,7 +264,8 @@ def interpolate_position(pos1, pos2, n_segments):
 
 
 class eetrack:
-    def __init__(self, root_state_w):
+    def __init__(self, root_state_w, tf_buffer):
+        self.tf_buffer = tf_buffer
         self.eetrack_midpt = root_state_w.clone()
         self.eetrack_midpt[1] += 0.3
         self.eetrack_end = None
@@ -339,19 +341,22 @@ class eetrack:
     def get_command(self, root_state_w):
         self.update_command()
 
-        pos_hand_b_left, quat_hand_b_left = body_pose_axa(
-            "left_hand_palm_link")
+        pos_hand_b_left, quat_hand_b_left = body_pose(
+            self.tf_buffer,
+            "left_hand_palm_link",
+            rot_type='quat'
+        )
 
         lerp_command_w_left = self.next_command_s_left
 
-        # lerp_command_b_left = math_utils.subtract_frame_transforms(
-        #     root_state_w[..., 0:3],
-        #     root_state_w[..., 3:7],
-        #     lerp_command_w_left[:, 0:3],
-        #     lerp_command_w_left[:, 3:7],
-        # )
+        lerp_command_b_left = math_utils.subtract_frame_transforms(
+            root_state_w[..., 0:3],
+            root_state_w[..., 3:7],
+            lerp_command_w_left[:, 0:3],
+            lerp_command_w_left[:, 3:7],
+        )
 
-        lerp_command_b_left = lerp_command_w_left
+        # lerp_command_b_left = lerp_command_w_left
 
         pos_delta_b_left, rot_delta_b_left = math_utils.compute_pose_error(
             pos_hand_b_left,
@@ -541,7 +546,7 @@ class Controller:
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
         # FIXME(ycho): give `root_state_w`
-        # self.eetrack = eetrack(root_state_w=None)
+        self.eetrack = None
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -702,9 +707,32 @@ class Controller:
 
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
-        _hands_command_ = np.zeros(6)
-        _hands_command_[0] = self.cmd[0] * 0.03
-        _hands_command_[2] = self.cmd[1] * 0.03
+        if True:
+            root_state_w = np.zeros(7)
+            lf_from_pelvis = self.tf_buffer.lookup_transform(
+                'left_ankle_roll_link',  # to
+                'pelvis',
+                rp.time.Time()
+            )
+            rf_from_pelvis = self.tf_buffer.lookup_transform(
+                'right_ankle_roll_link',  # to
+                'pelvis',
+                rp.time.Time()
+            )
+            # NOTE(ycho): we assume at least one of the feet is on the ground
+            #            and use the higher of the two as the pelvis height.
+            pelvis_height = max(lf_from_pelvis.transform.translation.z,
+                                rf_from_pelvis.transform.translation.z)
+            root_state_w[0:3] = [0, 0, pelvis_height]
+            root_state_w[3:7] = self.low_state.imu_state.quaternion
+
+        if self.eetrack is None:
+            self.eetrack = eetrack(root_state_w,self.tf_buffer)
+
+        _hands_command_ = self.eetrack.get_command(root_state_w)
+        # _hands_command_ = np.zeros(6)
+        # _hands_command_[0] = self.cmd[0] * 0.03
+        # _hands_command_[2] = self.cmd[1] * 0.03
 
         self.obs[:] = self.obsmap(self.low_state,
                                   self.action,
