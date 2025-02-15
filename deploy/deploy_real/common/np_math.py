@@ -2,6 +2,7 @@
 
 import numpy as np
 import torch
+import torch as th
 
 def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     """Convert rotations given as quaternions to axis/angle.
@@ -145,3 +146,16 @@ def index_map(k_to, k_from):
     """
     index_dict = {k: i for i, k in enumerate(k_to)}  # O(len(k_from))
     return [index_dict.get(k, -1) for k in k_from]  # O(len(k_to))
+
+
+
+def xyzw2wxyz(q_xyzw: th.Tensor, dim: int = -1):
+    if isinstance(q_xyzw, np.ndarray):
+        return np.roll(q_xyzw, 1, axis=dim)
+    return th.roll(q_xyzw, 1, dims=dim)
+
+
+def wxyz2xyzw(q_wxyz: th.Tensor, dim: int = -1):
+    if isinstance(q_wxyz, np.ndarray):
+        return np.roll(q_wxyz, -1, axis=dim)
+    return th.roll(q_wxyz, -1, dims=dim)
