@@ -356,7 +356,7 @@ class Observation:
             'pelvis',
             rp.time.Time()
         )
-        pelvis_height = [world_from_pelvis.translation[2]]
+        pelvis_height = [world_from_pelvis.transform.translation.z]
 
         obs = [
             base_ang_vel,
