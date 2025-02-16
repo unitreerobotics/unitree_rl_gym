@@ -617,16 +617,16 @@ class Controller:
                 rot_type='quat'
             )
             xyz0, quat_wxyz0 = world_from_pelvis
-            xyz1, quat_wxyz1 = self.default_pose_b[:3], self.default_pose_b[3:7]
+            xyz1, quat_wxyz1 = self.default_pose_b[0:3], self.default_pose_b[3:7]
             xyz, quat = combine_frame_transforms(
                 xyz0, quat_wxyz0,
                 xyz1, quat_wxyz1)
             self.target_pose = np.concatenate([xyz, quat])
-            print('validation...',
-                  self.target_pose,
-                  body_pose(self.tf_buffer,
-                            'left_hand_palm_link',
-                            'world', rot_type='quat'))
+            #print('validation...',
+            #      self.target_pose,
+            #      body_pose(self.tf_buffer,
+            #                'left_hand_palm_link',
+            #                'world', rot_type='quat'))
 
         if True:
             self.target_pose[..., :3] += 0.01 * self.cmd

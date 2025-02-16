@@ -131,7 +131,7 @@ class ActToDof:
         target_dof_pos += q_mot
         target_dof_pos[self.mot_from_arm] += res_q_ik
 
-        if True:
+        if False:
             target_dof_pos[self.mot_from_arm] += np.clip(
                 0.3 * left_arm_residual,
                 -0.2, 0.2)
