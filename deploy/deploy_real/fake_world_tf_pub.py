@@ -69,7 +69,7 @@ class FakeWorldPublisher(Node):
     def pelvis_height(self, low_state: LowStateHG):
         robot = self.robot
         q_mot = [self.low_state.motor_state[i_mot].q for i_mot in range(29)]
-        q_pin = np.zeros_like(self.ikctrl.cfg.q)
+        q_pin = np.zeros_like(self.robot.q0)
         q_pin[self.pin_from_mot] = q_mot
         cfg = pink.Configuration(robot.model, robot.data, q_pin)
 
