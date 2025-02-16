@@ -67,7 +67,10 @@ class FakeWorldPublisher(Node):
 
         # Set world_from_pelvis quaternion based on IMU state
         # TODO(ycho): consider applying 90-deg offset?
-        qw, qx, qy, qz = self.low_state.imu_state.quaternion
+        qw, qx, qy, qz = [
+            float(x) for x in 
+            self.low_state.imu_state.quaternion
+        ]
         t.transform.rotation.x = qx
         t.transform.rotation.y = qy
         t.transform.rotation.z = qz
