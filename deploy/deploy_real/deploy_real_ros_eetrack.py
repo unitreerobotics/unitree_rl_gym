@@ -42,6 +42,8 @@ quat_mul = math_utils.as_np(math_utils.quat_mul)
 quat_rotate = math_utils.as_np(math_utils.quat_rotate)
 quat_rotate_inverse = math_utils.as_np(math_utils.quat_rotate_inverse)
 wrap_to_pi = math_utils.as_np(math_utils.wrap_to_pi)
+combine_frame_transforms = math_utils.as_np(
+    math_utils.combine_frame_transforms)
 
 
 def body_pose(
@@ -439,9 +441,10 @@ class Controller:
             quat_wxyz = xyzw2wxyz(
                 pin.Quaternion(
                     default_pose.rotation).coeffs())
-            self.default_pose = np.concatenate([xyz, quat_wxyz])
-            self.target_pose = np.copy(self.default_pose)
-            print('default_pose', self.default_pose)
+            self.default_pose_b = np.concatenate([xyz, quat_wxyz])
+            # self.target_pose = np.copy(self.default_pose_b)
+            self.target_pose = None
+            # print('default_pose', self.default_pose_b)
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -605,6 +608,26 @@ class Controller:
         self.cmd[1] = self.remote_controller.lx * -1
         self.cmd[2] = self.remote_controller.rx * -1
 
+        if self.target_pose is None:
+            # NOTE(ycho): ensure target pose is defined in world frame!
+            world_from_pelvis = body_pose(
+                self.tf_buffer,
+                'pelvis',
+                'world',
+                rot_type='quat'
+            )
+            xyz0, quat_wxyz0 = world_from_pelvis
+            xyz1, quat_wxyz1 = self.default_pose_b[:3], self.default_pose_b[3:7]
+            xyz, quat = combine_frame_transforms(
+                xyz0, quat_wxyz0,
+                xyz1, quat_wxyz1)
+            self.target_pose = np.concatenate([xyz, quat])
+            print('validation...',
+                  self.target_pose,
+                  body_pose(self.tf_buffer,
+                            'left_hand_palm_link',
+                            'world', rot_type='quat'))
+
         if True:
             self.target_pose[..., :3] += 0.01 * self.cmd
 
@@ -612,15 +635,13 @@ class Controller:
         # to use the output of `eetrack`.
         if True:
             # NOTE(ycho): requires running `fake_world_tf_pub.py`.
-            world_from_pelvis = self.tf_buffer.lookup_transform(
-                'world',
+            world_from_pelvis = body_pose(
+                self.tf_buffer,
                 'pelvis',
-                rp.time.Time()
+                'world',
+                rot_type='quat'
             )
-            txn = world_from_pelvis.transform.translation
-            rxn = world_from_pelvis.transform.rotation
-            xyz = np.array([txn.x, txn.y, txn.z])
-            quat_wxyz = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
+            xyz, quat_wxyz = world_from_pelvis
             root_state_w = np.zeros(7)
             root_state_w[0:3] = xyz
             root_state_w[3:7] = quat_wxyz
@@ -634,9 +655,10 @@ class Controller:
                 torch.from_numpy(root_state_w)[None])[0].detach().cpu().numpy()
         else:
             _hands_command_ = np.zeros(6)
-            # _hands_command_[0] = self.cmd[0] * 0.03
-            # _hands_command_[2] = self.cmd[1] * 0.03
-            if True:
+
+            # TODO(ycho): restore updating to `hands_command`
+            # from `target_pose`.
+            if False:
                 q_mot = [self.low_state.motor_state[i_mot].q
                          for i_mot in range(29)]
                 # print('q_mot (out)', q_mot)
