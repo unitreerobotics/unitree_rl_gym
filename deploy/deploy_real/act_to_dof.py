@@ -98,7 +98,7 @@ class ActToDof:
 
 
         axa = hands_command_b[..., 3:]
-        angle = np.linalg.norm(axa, axis=-1)
+        angle = np.asarray(np.linalg.norm(axa, axis=-1))
         axis = axa / np.maximum(angle, 1e-6)
         d_quat = quat_from_angle_axis(angle, axis)
 
