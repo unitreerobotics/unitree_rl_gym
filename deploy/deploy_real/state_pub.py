@@ -33,6 +33,7 @@ class StatePublisher(Node):
         joint_state.header.stamp = now.to_msg()
         joint_state.name = self.joint_names
         joint_state.position = [0.0 for _ in self.joint_names]
+        joint_state.velocity = [0.0 for _ in self.joint_names]
 
         n:int = min(len(self.joint_names), len(self.low_state.motor_state))
         for i in range(n):
