@@ -1,4 +1,7 @@
-from legged_gym import LEGGED_GYM_ROOT_DIR
+try:
+    from legged_gym import LEGGED_GYM_ROOT_DIR
+except ModuleNotFoundError:
+    LEGGED_GYM_ROOT_DIR='../..'
 import numpy as np
 import yaml
 

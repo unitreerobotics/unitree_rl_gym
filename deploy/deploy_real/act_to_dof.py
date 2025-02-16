@@ -63,6 +63,8 @@ class ActToDof:
             self.config.lab_joint,
             self.config.non_arm_joint
         )
+        # x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 22, 24, 26, 28]
+
         self.default_nonarm = (
             np.asarray(self.config.lab_joint_offsets)[self.lab_from_nonarm]
         )
@@ -95,7 +97,6 @@ class ActToDof:
                 quat_rotate_inverse(world_from_pelvis_quat,
                                     hands_command_w[..., 3:6])
             ], axis=-1)
-
 
         axa = hands_command_b[..., 3:]
         angle = np.asarray(np.linalg.norm(axa, axis=-1))
@@ -168,59 +169,84 @@ def main():
     exps = []
     cals = []
     poss = []
+    # nonarm_offset = [-0.2000, -0.2000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,
+    #       0.0000,  0.4200,  0.4200, -0.2000, -0.2300, -0.2300, -0.3500,  0.0000,
+    #       0.0000,  0.0000,  1.0000,  0.0000,  0.0000,  0.0000]
+    # nonarm_joint_names=['left_hip_pitch_joint', 'right_hip_pitch_joint', 'waist_yaw_joint', 'left_hip_roll_joint', 'right_hip_roll_joint', 'waist_roll_joint', 'left_hip_yaw_joint', 'right_hip_yaw_joint', 'waist_pitch_joint', 'left_knee_joint', 'right_knee_joint', 'right_shoulder_pitch_joint', 'left_ankle_pitch_joint', 'right_ankle_pitch_joint', 'right_shoulder_roll_joint', 'left_ankle_roll_joint', 'right_ankle_roll_joint', 'right_shoulder_yaw_joint', 'right_elbow_joint', 'right_wrist_roll_joint', 'right_wrist_pitch_joint', 'right_wrist_yaw_joint']
+    # print( np.asarray(config.lab_joint_offsets)[act_to_dof.lab_from_nonarm] - nonarm_offset)
+    # print( list(config.non_arm_joint) == list(nonarm_joint_names))
 
-    for i in range(70):
-        obs = np.load(F'/tmp/eet5/obs{i:03d}.npy')[0]
+    mot_from_arm = index_map(d['motor_joint'], d['arm_joint'])
+    for i in range(61):
+        obs = np.load(F'/gate/eet6/obs{i:03d}.npy')[0]
         # print(obs.shape)
-        act = np.load(F'/tmp/eet5/act{i:03d}.npy')[0]
+        act = np.load(F'/gate/eet6/act{i:03d}.npy')[0]
         # print('act', act.shape)
-        dof_lab = np.load(F'/tmp/eet5/dof{i:03d}.npy')[0]
+        dof_lab = np.load(F'/gate/eet6/dof{i:03d}.npy')[0]
         mot_from_lab = index_map(d['motor_joint'], d['lab_joint'])
+        lab_from_mot = index_map(d['lab_joint'], d['motor_joint'])
         target_dof_pos = np.zeros_like(dof_lab)
-        target_dof_pos[mot_from_lab] = dof_lab
+        target_dof_pos[:] = dof_lab[lab_from_mot]
 
         dof = act_to_dof(obs, act)
 
         export = target_dof_pos
         calc = dof
 
-        mot_from_arm = index_map(d['motor_joint'], d['arm_joint'])
         # print('exported', target_dof_pos[mot_from_arm],
         #       'calculated', dof[mot_from_arm])
         # print( (export - calc)[mot_from_arm] )
-        exps.append(target_dof_pos[mot_from_arm])
-        cals.append(dof[mot_from_arm])
+
+        # exps.append(target_dof_pos[mot_from_arm])
+        # cals.append(dof[mot_from_arm])
+
+        exps.append(target_dof_pos)
+        cals.append(dof)
 
         q_lab = obs[..., 32:61]
-        q_mot = q_lab[act_to_dof.lab_from_mot]
+        q_mot = (q_lab + config.lab_joint_offsets)[act_to_dof.lab_from_mot]
         q_arm = q_mot[mot_from_arm]
-        poss.append(q_arm)
+        # poss.append(q_arm)
+        poss.append(q_mot)
+
+        # print('q_mot', q_mot,
+        #       'sim - q_mot', target_dof_pos - q_mot,
+        #       'real - q_mot', dof - q_mot)
+        # break
 
     exps = np.asarray(exps, dtype=np.float32)
     cals = np.asarray(cals, dtype=np.float32)
     poss = np.asarray(poss, dtype=np.float32)
-    print(exps.shape)
-    print(cals.shape)
+    # print(exps.shape)
+    # print(cals.shape)
 
-    fig, ax = plt.subplots(7, 1)
+    # fig, ax = plt.subplots(29, 1)
+    fig, axs = plt.subplots(6, 5)
 
-    q_lo = act_to_dof.lim_lo_pin[act_to_dof.pin_from_arm]
-    q_hi = act_to_dof.lim_hi_pin[act_to_dof.pin_from_arm]
-    RES = True
-    for i in range(7):
+    q_lo = act_to_dof.lim_lo_pin[act_to_dof.pin_from_mot]
+    q_hi = act_to_dof.lim_hi_pin[act_to_dof.pin_from_mot]
+    RES = False
+    for i in range(29):
+
+        ii = i // 5
+        jj = i % 5
+        ax = axs[ii, jj]
+
+        ax.set_title(config.motor_joint[i])
         if RES:
-            ax[i].axhline(0)
+            ax.axhline(0)
         else:
-            ax[i].axhline(q_lo[i], color='k', linestyle='--')
-            ax[i].axhline(q_hi[i], color='k', linestyle='--')
+            ax.axhline(q_lo[i], color='k', linestyle='--')
+            ax.axhline(q_hi[i], color='k', linestyle='--')
+            pass
         if RES:
-            ax[i].plot(exps[:, i] - poss[:, i], label='sim')
-            ax[i].plot(cals[:, i] - poss[:, i], label='real')
+            ax.plot(exps[:, i] - poss[:, i], label='sim')
+            ax.plot(cals[:, i] - poss[:, i], label='real')
         else:
-            ax[i].plot(poss[:, i], label='pos')
-            ax[i].plot(exps[:, i], label='sim')
-            ax[i].plot(cals[:, i], label='real')
-        ax[i].legend()
+            ax.plot(poss[:, i], label='pos')
+            ax.plot(exps[:, i], 'x-', label='sim')
+            ax.plot(cals[:, i], '+-', label='real')
+        ax.legend()
     plt.show()
 
 
