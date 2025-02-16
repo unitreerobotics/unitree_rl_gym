@@ -652,9 +652,9 @@ class Controller:
                     current_pose.rotation).coeffs())
                 # q_target @ q_current^{-1}
                 d_quat = quat_mul(
-                    torch.from_numpy(self.target_pose[3:7]),
-                    torch.from_numpy(quat_conjugate(quat_wxyz))
-                ).detach().cpu().numpy()
+                    self.target_pose[3:7],
+                    quat_conjugate(quat_wxyz)
+                )
                 d_axa = axis_angle_from_quat(d_quat)
                 _hands_command_[3:6] = d_axa
                 # bprint('hands_command', _hands_command_)
