@@ -37,6 +37,12 @@ class FakeWorldPublisher(Node):
             10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
+        pin_joint = self.robot.model.names[1:]
+        self.pin_from_mot = index_map(
+            pin_joint,
+            self.config.motor_joint
+        )
+
     def on_low_state(self,
                      msg: LowStateHG):
         self.low_state = msg
