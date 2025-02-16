@@ -91,9 +91,9 @@ class FakeWorldPublisher(Node):
         # NOTE(ycho): 0.02 = "roll_link" height (approx)
         world_from_pelvis_quat = np.asarray(low_state.imu_state.quaternion,
                                             dtype=np.float32)
-        xyz_rf = np.asarray( pelvis_from_rf.translatio,
+        xyz_rf = np.asarray( pelvis_from_rf.translation,
                             dtype=np.float32)
-        xyz_lf = np.asarray( pelvis_from_lf.translatio,
+        xyz_lf = np.asarray( pelvis_from_lf.translation,
                             dtype=np.float32)
 
         pelvis_z_rf = -quat_rotate(
