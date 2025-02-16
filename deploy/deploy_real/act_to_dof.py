@@ -96,9 +96,11 @@ class ActToDof:
                                     hands_command_w[..., 3:6])
             ], axis=-1)
 
-        d_quat = quat_from_angle_axis(
-            hands_command_b[..., 3:]
-        ).detach().cpu().numpy()
+
+        axa = hands_command_b[..., 3:]
+        angle = np.linalg.norm(axa, axis=-1)
+        axis = axa / np.maximum(angle, 1e-6)
+        d_quat = quat_from_angle_axis(angle, axis)
 
         source_pose = self.ikctrl.fk(q_pin)
         source_xyz = source_pose.translation

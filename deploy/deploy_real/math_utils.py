@@ -1618,6 +1618,9 @@ def main():
     axa_th = axis_angle_from_quat(th.as_tensor(quat,
                                                device='cpu'))
     print(axa_th.detach().cpu().numpy())
+    print( quat_from_angle_axis(
+            th.zeros(1),
+            th.zeros(1,3)))
 
 if __name__ == '__main__':
     main()
