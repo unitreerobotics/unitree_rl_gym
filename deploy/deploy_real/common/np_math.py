@@ -3,6 +3,17 @@
 import numpy as np
 import torch
 import torch as th
+from contextlib import contextmanager
+import os
+
+@contextmanager
+def with_dir(d):
+    d0 = os.getcwd()
+    try:
+        os.chdir(d)
+        yield
+    finally:
+        os.chdir(d0)
 
 def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     """Convert rotations given as quaternions to axis/angle.

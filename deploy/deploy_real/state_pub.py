@@ -26,12 +26,6 @@ class StatePublisher(Node):
         self.get_logger().info("{0} started".format(self.nodeName))
         self.joint_state = JointState()
 
-    # def wait_for_low_state(self):
-    #     while self.low_state.crc == 0:
-    #         print(self.low_state)
-    #         time.sleep(self.config.control_dt)
-    #     print("Successfully connected to the robot.")
-
     def on_low_state(self, msg: LowStateHG):
         self.low_state = msg
         joint_state = self.joint_state
@@ -40,11 +34,10 @@ class StatePublisher(Node):
         joint_state.name = self.joint_names
         joint_state.position = [0.0 for _ in self.joint_names]
 
-        # print('a', len(self.joint_names)) # 29
-        # print('b', len(self.low_state.motor_state)) # 35??
         n:int = min(len(self.joint_names), len(self.low_state.motor_state))
         for i in range(n):
             joint_state.position[i] = self.low_state.motor_state[i].q
+            joint_state.velocity[i] = self.low_state.motor_state[i].dq
         self.joint_pub.publish(joint_state)
     
     def run(self):

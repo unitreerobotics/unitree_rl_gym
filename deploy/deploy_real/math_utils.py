@@ -11,12 +11,54 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn.functional
-from typing import Literal
+import torch as th
+from typing import Literal, Mapping, Iterable
+from functools import wraps
 
 """
 General
 """
 
+def th2np(x):
+    if isinstance(x, np.ndarray):
+        return x
+
+    if isinstance(x, th.Tensor):
+        return x.numpy()
+
+    if isinstance(x, Mapping):
+        return {k: th2np(v) for (k,v) in x.items()}
+
+    if isinstance(x, Iterable):
+        return [th2np(e) for e in x]
+    return x
+
+def np2th(x):
+    if isinstance(x, th.Tensor):
+        return x
+
+    if isinstance(x, np.ndarray):
+        return th.from_numpy(x)
+
+    if isinstance(x, Mapping):
+        return {k: np2th(v) for (k,v) in x.items()}
+
+    if isinstance(x, Iterable):
+        return [np2th(e) for e in x]
+
+    return x
+
+def as_np(func):
+    @wraps(func)
+    def np_func(*args, **kwds):
+        th_args = np2th(args)
+        th_kwds = np2th(kwds)
+        th_out = func(*th_args, **th_kwds)
+        # TODO(ycho): consider interoperable functions,
+        # i.e., numpy in -> numpy out; torch in -> torch out
+        np_out = th2np(th_out)
+        return np_out
+    return np_func
 
 @torch.jit.script
 def scale_transform(
@@ -1566,3 +1608,16 @@ def slerp(q0: torch.Tensor, q1: torch.Tensor, steps: torch.Tensor):
     diff_quat = safe_rotvec2quat(diff)
 
     return quat_mul(q0, diff_quat)
+
+def main():
+    quat = np.random.normal(size=4)
+    quat /= np.linalg.norm(quat)
+    axa  = as_np(axis_angle_from_quat)(quat)
+    print(axa)
+
+    axa_th = axis_angle_from_quat(th.as_tensor(quat,
+                                               device='cpu'))
+    print(axa_th.detach().cpu().numpy())
+
+if __name__ == '__main__':
+    main()
