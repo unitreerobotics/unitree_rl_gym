@@ -11,6 +11,7 @@ from tf2_ros import TransformBroadcaster, TransformStamped
 import numpy as np
 import pinocchio as pin
 import pink
+import yaml
 from common.np_math import (index_map, with_dir)
 from math_utils import (as_np, quat_rotate)
 
@@ -20,6 +21,7 @@ quat_rotate = as_np(quat_rotate)
 class FakeWorldPublisher(Node):
     def __init__(self):
         super().__init__('fake_world_publisher')
+        
 
         urdf_path = '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf'
         path = Path(urdf_path)
@@ -38,9 +40,11 @@ class FakeWorldPublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         pin_joint = self.robot.model.names[1:]
+        with open('./configs/ik.yaml', 'r') as fp:
+            motor_joint = yaml.safe_load(fp)['motor_joint']
+
         self.pin_from_mot = index_map(
-            pin_joint,
-            self.config.motor_joint
+            pin_joint, motor_joint
         )
 
     def on_low_state(self,
