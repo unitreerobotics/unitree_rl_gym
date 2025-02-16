@@ -88,8 +88,10 @@ class FakeWorldPublisher(Node):
         pelvis_from_lf = cfg.get_transform_frame_to_world(
             'left_ankle_roll_link')
 
-        # 0.02 = "roll_link" height (approx)
-        world_from_pelvis_quat = low_state.imu_state.quaternion
+        # NOTE(ycho): 0.02 = "roll_link" height (approx)
+        world_from_pelvis_quat = np.asarray(low_state.imu_state.quaternion,
+                                            dtype=np.float32)
+
         pelvis_z_rf = -quat_rotate(
             world_from_pelvis_quat,
             pelvis_from_rf.translation)[2] + 0.02
