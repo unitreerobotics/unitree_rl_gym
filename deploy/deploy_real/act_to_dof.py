@@ -89,12 +89,12 @@ class ActToDof:
         else:
             world_from_pelvis_quat = root_quat_wxyz.astype(np.float32)
             hands_command_w = hands_command_w.astype(np.float32)
-            hands_command_b = np.concatenate(
+            hands_command_b = np.concatenate([
                 quat_rotate_inverse(world_from_pelvis_quat,
                                     hands_command_w[..., :3]),
                 quat_rotate_inverse(world_from_pelvis_quat,
                                     hands_command_w[..., 3:6])
-            )
+            ], axis=-1)
 
         d_quat = quat_from_angle_axis(
             hands_command_b[..., 3:]
