@@ -131,11 +131,12 @@ class ActToDof:
         target_dof_pos += q_mot
         target_dof_pos[self.mot_from_arm] += res_q_ik
 
-        if False:
+        if True:
             target_dof_pos[self.mot_from_arm] += np.clip(
                 0.3 * left_arm_residual,
                 -0.2, 0.2)
 
+        if True:
             # print('default joint pos', self.default_nonarm)
             # print('joint order', self.config.non_arm_joint)
             # print('mot_from_nonarm', self.mot_from_nonarm)
@@ -143,10 +144,10 @@ class ActToDof:
                 self.default_nonarm + 0.5 * non_arm_joint_pos
             )
 
-            target_dof_pos[self.mot_from_arm] = np.clip(
-                target_dof_pos[self.mot_from_arm],
-                self.lim_lo_pin[self.pin_from_arm],
-                self.lim_hi_pin[self.pin_from_arm]
+            target_dof_pos = np.clip(
+                target_dof_pos,
+                self.lim_lo_pin[self.pin_from_mot],
+                self.lim_hi_pin[self.pin_from_mot]
             )
 
         return target_dof_pos

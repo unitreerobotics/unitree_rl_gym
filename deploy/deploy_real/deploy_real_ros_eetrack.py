@@ -12,6 +12,7 @@ from unitree_go.msg import LowCmd as LowCmdGo, LowState as LowStateGo
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+from tf2_ros import TransformBroadcaster, TransformStamped
 from common.command_helper_ros import create_damping_cmd, create_zero_cmd, init_cmd_hg, init_cmd_go, MotorMode
 from common.rotation_helper import get_gravity_orientation, transform_imu_data
 from common.remote_controller import RemoteController, KeyMap
@@ -367,7 +368,7 @@ class Observation:
             hand_pose,
             projected_com,
             joint_pos,
-            0.0 * joint_vel,
+            joint_vel,
             actions,
             hands_command,
             right_arm_com,
@@ -426,6 +427,7 @@ class Controller:
         self._node = rp.create_node("low_level_cmd_sender")
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self._node)
+        self.tf_broadcaster = TransformBroadcaster(self._node)
         self.obsmap = Observation(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
@@ -476,9 +478,9 @@ class Controller:
 
         # NOTE(ycho):
         # if running from real robot:
-        # self.mode = Mode.wait
+        self.mode = Mode.wait
         # if running from rosbag:
-        self.mode = Mode.policy
+        # self.mode = Mode.policy
 
         self._mode_change = True
         self._timer = self._node.create_timer(
@@ -596,6 +598,32 @@ class Controller:
             self._mode_change = True
             self.mode = Mode.policy
 
+    def publish_hand_target(self):
+        t = TransformStamped()
+
+        # Read message content and assign it to
+        # corresponding tf variables
+        t.header.stamp = self._node.get_clock().now().to_msg()
+        t.header.frame_id = 'world'
+        t.child_frame_id = 'target'
+
+        # Turtle only exists in 2D, thus we get x and y translation
+        # coordinates from the message and set the z coordinate to 0
+        t.transform.translation.x = self.target_pose[0]
+        t.transform.translation.y = self.target_pose[1]
+        t.transform.translation.z = self.target_pose[2]
+
+        # Set world_from_pelvis quaternion based on IMU state
+        # TODO(ycho): consider applying 90-deg offset?
+        qw, qx, qy, qz = [float(x) for x in self.target_pose[3:7] ]
+        t.transform.rotation.x = qx
+        t.transform.rotation.y = qy
+        t.transform.rotation.z = qz
+        t.transform.rotation.w = qw
+
+        # Send the transformation
+        self.tf_broadcaster.sendTransform(t)
+
     def run_policy(self):
         if self.remote_controller.button[KeyMap.select] == 1:
             self._mode_change = True
@@ -610,17 +638,26 @@ class Controller:
 
         if self.target_pose is None:
             # NOTE(ycho): ensure target pose is defined in world frame!
-            world_from_pelvis = body_pose(
-                self.tf_buffer,
-                'pelvis',
-                'world',
-                rot_type='quat'
-            )
-            xyz0, quat_wxyz0 = world_from_pelvis
-            xyz1, quat_wxyz1 = self.default_pose_b[0:3], self.default_pose_b[3:7]
-            xyz, quat = combine_frame_transforms(
-                xyz0, quat_wxyz0,
-                xyz1, quat_wxyz1)
+            if False:
+                world_from_pelvis = body_pose(
+                    self.tf_buffer,
+                    'pelvis',
+                    'world',
+                    rot_type='quat'
+                )
+                xyz0, quat_wxyz0 = world_from_pelvis
+                xyz1, quat_wxyz1 = self.default_pose_b[0:3], self.default_pose_b[3:7]
+
+                xyz, quat = combine_frame_transforms(
+                    xyz0, quat_wxyz0,
+                    xyz1, quat_wxyz1)
+            else:
+                xyz, quat = body_pose(
+                        self.tf_buffer,
+                        'left_hand_palm_link',
+                        'world',
+                        rot_type='quat'
+                )
             self.target_pose = np.concatenate([xyz, quat])
             #print('validation...',
             #      self.target_pose,
@@ -630,6 +667,7 @@ class Controller:
 
         if True:
             self.target_pose[..., :3] += 0.01 * self.cmd
+            self.publish_hand_target()
 
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
@@ -658,28 +696,36 @@ class Controller:
 
             # TODO(ycho): restore updating to `hands_command`
             # from `target_pose`.
-            if False:
-                q_mot = [self.low_state.motor_state[i_mot].q
-                         for i_mot in range(29)]
-                # print('q_mot (out)', q_mot)
-                q_pin = np.zeros_like(self.ikctrl.cfg.q)
-                q_pin[self.pin_from_mot] = q_mot
+            if True:
+                if False:
+                    q_mot = [self.low_state.motor_state[i_mot].q
+                             for i_mot in range(29)]
+                    # print('q_mot (out)', q_mot)
+                    q_pin = np.zeros_like(self.ikctrl.cfg.q)
+                    q_pin[self.pin_from_mot] = q_mot
+                    current_pose = self.ikctrl.fk(q_pin)
 
-                current_pose = self.ikctrl.fk(q_pin)
+                    cur_xyz = current_pose.translation
+                    cur_quat = xyzw2wxyz(pin.Quaternion(
+                        current_pose.rotation).coeffs())
+                else:
+                    cur_xyz, cur_quat = body_pose(
+                            self.tf_buffer,
+                            'left_hand_palm_link',
+                            'world',
+                            rot_type='quat'
+                    )
                 _hands_command_ = np.zeros(6)
-                _hands_command_[0:3] = (self.target_pose[:3]
-                                        - current_pose.translation)
+                _hands_command_[0:3] = (self.target_pose[:3] - cur_xyz)
 
-                quat_wxyz = xyzw2wxyz(pin.Quaternion(
-                    current_pose.rotation).coeffs())
                 # q_target @ q_current^{-1}
                 d_quat = quat_mul(
                     self.target_pose[3:7],
-                    quat_conjugate(quat_wxyz)
+                    quat_conjugate(cur_quat)
                 )
                 d_axa = axis_angle_from_quat(d_quat)
                 _hands_command_[3:6] = d_axa
-                # bprint('hands_command', _hands_command_)
+                print('hands_command', _hands_command_)
 
         # print(_hands_command_)
         # _hands_command_ = np.zeros(6)
@@ -730,9 +776,14 @@ class Controller:
         for i in range(len(self.config.motor_joint)):
             self.low_cmd.motor_cmd[i].q = float(target_dof_pos[i])
             self.low_cmd.motor_cmd[i].dq = 0.0
+            self.low_cmd.motor_cmd[i].kp = 1.0 * float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = 1.0 * float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].tau = 0.0
+
+        # reduce KP for non-arm joints
+        for i in self.mot_from_nonarm:
             self.low_cmd.motor_cmd[i].kp = 0.05 * float(self.config.kps[i])
             self.low_cmd.motor_cmd[i].kd = 0.05 * float(self.config.kds[i])
-            self.low_cmd.motor_cmd[i].tau = 0.0
 
         # send the command
         self.send_cmd(self.low_cmd)
