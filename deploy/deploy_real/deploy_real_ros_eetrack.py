@@ -35,12 +35,14 @@ class Mode(Enum):
     policy = 4
     null = 5
 
+
 axis_angle_from_quat = math_utils.as_np(math_utils.axis_angle_from_quat)
 quat_conjugate = math_utils.as_np(math_utils.quat_conjugate)
 quat_mul = math_utils.as_np(math_utils.quat_mul)
 quat_rotate = math_utils.as_np(math_utils.quat_rotate)
 quat_rotate_inverse = math_utils.as_np(math_utils.quat_rotate_inverse)
 wrap_to_pi = math_utils.as_np(math_utils.wrap_to_pi)
+
 
 def body_pose(
         tf_buffer,
@@ -274,7 +276,19 @@ class Observation:
         # base_lin_vel = np.zeros(3)
         ang_vel = np.array([low_state.imu_state.gyroscope],
                            dtype=np.float32)
-        quat = low_state.imu_state.quaternion
+
+        if True:
+            # NOTE(ycho): requires running `fake_world_tf_pub.py`.
+            world_from_pelvis = self.tf_buffer.lookup_transform(
+                'world',
+                'pelvis',
+                rp.time.Time()
+            )
+            rxn = world_from_pelvis.transform.rotation
+            quat = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
+        else:
+            quat = low_state.imu_state.quaternion
+
         if self.config.imu_type == "torso":
             waist_yaw = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
             waist_yaw_omega = low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
@@ -283,6 +297,10 @@ class Observation:
                 waist_yaw_omega=waist_yaw_omega,
                 imu_quat=quat,
                 imu_omega=ang_vel)
+
+        # NOTE(ycho): `ang_vel` is _probably_ in the pelvis frame,
+        # since otherwise transform_imu_data() would be unnecessary for
+        # `ang_vel`.
         base_ang_vel = ang_vel.squeeze(0)
 
         # TODO(ycho): check if the convention "q_base^{-1} @ g" holds.
@@ -333,28 +351,13 @@ class Observation:
             "left_wrist_roll_link",
             "left_wrist_yaw_link"
         ])
-        if True:  # hack
-            lf_from_pelvis = self.tf_buffer.lookup_transform(
-                'left_ankle_roll_link',  # to
-                'pelvis',
-                rp.time.Time()
-            )
-            rf_from_pelvis = self.tf_buffer.lookup_transform(
-                'right_ankle_roll_link',  # to
-                'pelvis',
-                rp.time.Time()
-            )
-            # NOTE(ycho): we assume at least one of the feet is on the ground
-            #            and use the higher of the two as the pelvis height.
-            pelvis_height = max(lf_from_pelvis.transform.translation.z,
-                                rf_from_pelvis.transform.translation.z)
-            pelvis_height = [pelvis_height]
-        else:
-            pelvis_height = np.abs(np.dot(
-                projected_gravity,  # world frame
-                fp_l[0]
-            )
-            )
+        world_from_pelvis = self.tf_buffer.lookup_transform(
+            'world',
+            'pelvis',
+            rp.time.Time()
+        )
+        pelvis_height = [world_from_pelvis.translation[2]]
+
         obs = [
             base_ang_vel,
             projected_gravity,
@@ -468,7 +471,12 @@ class Controller:
         elif config.msg_type == "go":
             init_cmd_go(self.low_cmd, weak_motor=self.config.weak_motor)
 
-        self.mode = Mode.wait
+        # NOTE(ycho):
+        # if running from real robot:
+        # self.mode = Mode.wait
+        # if running from rosbag:
+        self.mode = Mode.policy
+
         self._mode_change = True
         self._timer = self._node.create_timer(
             self.config.control_dt, self.run_wrapper)
@@ -602,25 +610,19 @@ class Controller:
 
         # FIXME(ycho): implement `_hands_command_`
         # to use the output of `eetrack`.
-
         if True:
+            # NOTE(ycho): requires running `fake_world_tf_pub.py`.
+            world_from_pelvis = self.tf_buffer.lookup_transform(
+                'world',
+                'pelvis',
+                rp.time.Time()
+            )
+            xyz = world_from_pelvis.transform.translation
+            rxn = world_from_pelvis.transform.rotation
+            quat_wxyz = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
             root_state_w = np.zeros(7)
-            lf_from_pelvis = self.tf_buffer.lookup_transform(
-                'left_ankle_roll_link',  # to
-                'pelvis',
-                rp.time.Time()
-            )
-            rf_from_pelvis = self.tf_buffer.lookup_transform(
-                'right_ankle_roll_link',  # to
-                'pelvis',
-                rp.time.Time()
-            )
-            # NOTE(ycho): we assume at least one of the feet is on the ground
-            #            and use the higher of the two as the pelvis height.
-            pelvis_height = max(lf_from_pelvis.transform.translation.z,
-                                rf_from_pelvis.transform.translation.z)
-            root_state_w[0:3] = [0, 0, pelvis_height]
-            root_state_w[3:7] = self.low_state.imu_state.quaternion
+            root_state_w[0:3] = xyz
+            root_state_w[3:7] = quat_wxyz
 
         if self.eetrack is None:
             self.eetrack = eetrack(torch.from_numpy(root_state_w)[None],
@@ -675,23 +677,24 @@ class Controller:
 
         # hands_command = obs[..., 119:125]
         if False:
-        world_from_body_quat = math_utils.quat_from_euler_xyz(
-            th.as_tensor([0], dtype=th.float32),
-            th.as_tensor([0], dtype=th.float32),
-            th.as_tensor([1.57], dtype=th.float32)).reshape(4)
-        obs_tensor[..., 119:122] = math_utils.quat_rotate(
-            world_from_body_quat[None],
-            obs_tensor[..., 119:122])
-        obs_tensor[..., 122:125] = math_utils.quat_rotate(
-            world_from_body_quat[None],
-            obs_tensor[..., 122:125])
+            world_from_body_quat = math_utils.quat_from_euler_xyz(
+                th.as_tensor([0], dtype=th.float32),
+                th.as_tensor([0], dtype=th.float32),
+                th.as_tensor([1.57], dtype=th.float32)).reshape(4)
+            obs_tensor[..., 119:122] = math_utils.quat_rotate(
+                world_from_body_quat[None],
+                obs_tensor[..., 119:122])
+            obs_tensor[..., 122:125] = math_utils.quat_rotate(
+                world_from_body_quat[None],
+                obs_tensor[..., 122:125])
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
         # np.save(F'{logpath}/act{self.counter:03d}.npy',
         #         self.action)
 
         target_dof_pos = self.actmap(
             self.obs,
-            self.action
+            self.action,
+            root_state_w[3:7]
         )
         # print('??',
         #         target_dof_pos,
