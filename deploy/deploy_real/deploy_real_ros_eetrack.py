@@ -617,9 +617,8 @@ class Controller:
                 'pelvis',
                 rp.time.Time()
             )
-            xyz = world_from_pelvis.transform.translation
+            txn = world_from_pelvis.transform.translation
             rxn = world_from_pelvis.transform.rotation
-
             xyz = np.array([txn.x, txn.y, txn.z])
             quat_wxyz = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
             root_state_w = np.zeros(7)
