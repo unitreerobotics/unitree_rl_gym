@@ -145,11 +145,11 @@ class ActToDof:
                 self.default_nonarm + 0.5 * non_arm_joint_pos
             )
 
-            target_dof_pos = np.clip(
-                target_dof_pos,
-                self.lim_lo_pin[self.pin_from_mot],
-                self.lim_hi_pin[self.pin_from_mot]
-            )
+            # target_dof_pos = np.clip(
+            #     target_dof_pos,
+            #     self.lim_lo_pin[self.pin_from_mot],
+            #     self.lim_hi_pin[self.pin_from_mot]
+            # )
 
         return target_dof_pos
 
