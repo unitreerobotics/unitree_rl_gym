@@ -337,7 +337,7 @@ class Controller:
 
         action = np.zeros_like(self.action,
                           dtype=np.float32)
-        action[self.mot_from_lab] = self.action
+        action[self.mot_from_lab] = self.action # index_map works ?
 
         target_dof_pos = self.config.default_angles + action * self.config.action_scale
 
