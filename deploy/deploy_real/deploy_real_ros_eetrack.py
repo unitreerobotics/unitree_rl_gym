@@ -46,6 +46,13 @@ wrap_to_pi = math_utils.as_np(math_utils.wrap_to_pi)
 combine_frame_transforms = math_utils.as_np(
     math_utils.combine_frame_transforms)
 
+class GlobalClock:
+    def __init__(self, node):
+        self.node = node
+
+    def get_time(self):
+        return self.node.get_clock().now()
+clock = None
 
 def body_pose(
         tf_buffer,
@@ -56,6 +63,7 @@ def body_pose(
     """ --> tf does not exist """
     if stamp is None:
         stamp = rp.time.Time()
+        #stamp = clock.get_time()
     try:
         # t = "ref{=pelvis}_from_frame" transform
         t = tf_buffer.lookup_transform(
@@ -146,20 +154,26 @@ def interpolate_position(pos1, pos2, n_segments):
 class eetrack:
     def __init__(self, root_state_w, tf_buffer):
         self.tf_buffer = tf_buffer
-        self.eetrack_midpt = root_state_w.clone()
-        self.eetrack_midpt[..., 1] += 0.3
+        # self.eetrack_midpt = root_state_w.clone()
+        # self.eetrack_midpt[..., 1] += 0.3
+        self.eetrack_midpt = (
+                root_state_w[..., :3] +
+                quat_rotate(root_state_w[0, 3:7].detach().cpu().numpy(),
+                    np.array([0.3, 0.0, 0.0]))[None]
+        )
         self.eetrack_end = None
         self.eetrack_subgoal = None
         self.number_of_subgoals = 30
         self.eetrack_line_length = 0.3
         self.device = "cpu"
-        self.create_eetrack()
+        self.create_eetrack(root_state_w)
         self.eetrack_subgoal = self.create_subgoal()
         self.sg_idx = 0
         # first subgoal sampling time = 1.0s
-        self.init_time = rp.time.Time().nanoseconds / 1e9 + 1.0
+        # self.init_time = rp.time.Time()#.nanoseconds / 1e9 + 1.0
+        self.init_time = clock.get_time()
 
-    def create_eetrack(self):
+    def create_eetrack(self, root_state_w):
         self.eetrack_start = self.eetrack_midpt.clone()
         self.eetrack_end = self.eetrack_midpt.clone()
         is_hor = rd.choice([True, False])
@@ -168,15 +182,41 @@ class eetrack:
         is_hor = True
         eetrack_offset = 0.0
         if is_hor:
-            self.eetrack_start[..., 2] += eetrack_offset
-            self.eetrack_end[..., 2] += eetrack_offset
-            self.eetrack_start[..., 0] -= (self.eetrack_line_length) / 2.
-            self.eetrack_end[..., 0] += (self.eetrack_line_length) / 2.
+            dx = (self.eetrack_line_length) / 2.
+            dz = eetrack_offset
+            delta_body0 = [0, +dx, dz]
+            delta_body1 = [0, -dx, dz]
+
+            self.eetrack_start += math_utils.quat_rotate(
+                    root_state_w[..., 3:7].float(),
+                    th.as_tensor(delta_body0, dtype=th.float32)[None]
+            )
+            self.eetrack_end += math_utils.quat_rotate(
+                    root_state_w[..., 3:7].float(),
+                    th.as_tensor(delta_body1, dtype=th.float32)[None]
+            )
+            # self.eetrack_start[..., 2] += eetrack_offset
+            # self.eetrack_end[..., 2] += eetrack_offset
+            # self.eetrack_start[..., 0] -= (self.eetrack_line_length) / 2.
+            # self.eetrack_end[..., 0] += (self.eetrack_line_length) / 2.
         else:
-            self.eetrack_start[..., 0] += eetrack_offset
-            self.eetrack_end[..., 0] += eetrack_offset
-            self.eetrack_start[..., 2] += (self.eetrack_line_length) / 2.
-            self.eetrack_end[..., 2] -= (self.eetrack_line_length) / 2.
+            # self.eetrack_start[..., 0] += eetrack_offset
+            # self.eetrack_end[..., 0] += eetrack_offset
+            # self.eetrack_start[..., 2] += (self.eetrack_line_length) / 2.
+            # self.eetrack_end[..., 2] -= (self.eetrack_line_length) / 2.
+            dx = eetrack_offset
+            dz = (self.eetrack_line_length) / 2.
+            delta_body0 = [0, dx, +dz]
+            delta_body1 = [0, dx, -dz]
+            self.eetrack_start += math_utils.quat_rotate(
+                    root_state_w[..., 3:7],
+                    th.as_tensor(delta_body0)[None]
+            )
+            self.eetrack_end += math_utils.quat_rotate(
+                    root_state_w[..., 3:7],
+                    th.as_tensor(delta_body1)[None]
+            )
+
         return self.eetrack_start, self.eetrack_end
 
     def create_direction(self):
@@ -213,11 +253,13 @@ class eetrack:
         return torch.cat([eetrack_subgoals, eetrack_ori], dim=2)
 
     def update_command(self):
-        time = self.init_time - rp.time.Time().nanoseconds / 1e9
-        if (time >= 0):
-            self.sg_idx = int(time / 0.1 + 1)
+        # print(rp.time.Time().nanoseconds)
+        time = (clock.get_time() - self.init_time).nanoseconds / 1e9
+        if (time >= 1.0):
+            self.sg_idx = int((time-1)/ 0.1 + 1)
+        print(time, self.sg_idx)
         # self.sg_idx.clamp_(0, self.number_of_subgoals + 1)
-        self.sg_idx = min(self.sg_idx, self.number_of_subgoals + 1)
+        self.sg_idx = min(self.sg_idx, self.number_of_subgoals)
         self.next_command_s_left = self.eetrack_subgoal[...,
                                                         self.sg_idx, :]
 
@@ -286,6 +328,7 @@ class Observation:
                 'world',
                 'pelvis',
                 rp.time.Time()
+                #clock.get_time()
             )
             rxn = world_from_pelvis.transform.rotation
             quat = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
@@ -358,6 +401,7 @@ class Observation:
             'world',
             'pelvis',
             rp.time.Time()
+            #clock.get_time()
         )
         pelvis_height = [world_from_pelvis.transform.translation.z]
 
@@ -425,6 +469,10 @@ class Controller:
         # ROS handles & helpers
         rp.init()
         self._node = rp.create_node("low_level_cmd_sender")
+
+        global clock
+        clock = GlobalClock(self._node)
+
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self._node)
         self.tf_broadcaster = TransformBroadcaster(self._node)
@@ -609,9 +657,9 @@ class Controller:
 
         # Turtle only exists in 2D, thus we get x and y translation
         # coordinates from the message and set the z coordinate to 0
-        t.transform.translation.x = self.target_pose[0]
-        t.transform.translation.y = self.target_pose[1]
-        t.transform.translation.z = self.target_pose[2]
+        t.transform.translation.x = float(self.target_pose[0])
+        t.transform.translation.y = float(self.target_pose[1])
+        t.transform.translation.z = float(self.target_pose[2])
 
         # Set world_from_pelvis quaternion based on IMU state
         # TODO(ycho): consider applying 90-deg offset?
@@ -665,7 +713,7 @@ class Controller:
             #                'left_hand_palm_link',
             #                'world', rot_type='quat'))
 
-        if True:
+        if False:
             self.target_pose[..., :3] += 0.01 * self.cmd
             self.publish_hand_target()
 
@@ -688,15 +736,23 @@ class Controller:
             self.eetrack = eetrack(torch.from_numpy(root_state_w)[None],
                                    self.tf_buffer)
 
-        if False:
+
+        if True:
             _hands_command_ = self.eetrack.get_command(
                 torch.from_numpy(root_state_w)[None])[0].detach().cpu().numpy()
+
+            # NOTE(ycho) EETRACK version
+            if True:
+                self.target_pose = np.copy(
+                        self.eetrack.next_command_s_left.squeeze().detach().cpu().numpy()
+                        )
+                self.publish_hand_target()
         else:
             _hands_command_ = np.zeros(6)
 
             # TODO(ycho): restore updating to `hands_command`
             # from `target_pose`.
-            if True:
+            if False:
                 if False:
                     q_mot = [self.low_state.motor_state[i_mot].q
                              for i_mot in range(29)]
@@ -726,6 +782,35 @@ class Controller:
                 d_axa = axis_angle_from_quat(d_quat)
                 _hands_command_[3:6] = d_axa
                 print('hands_command', _hands_command_)
+            else:
+                pelvis_from_world = body_pose(
+                    self.tf_buffer,
+                    'world',
+                    'pelvis',
+                    rot_type='quat'
+                )
+                dst_xyz, dst_quat = combine_frame_transforms(
+                        pelvis_from_world[0],
+                        pelvis_from_world[1],
+                        self.target_pose[..., :3],
+                        self.target_pose[..., 3:7]
+                )
+
+                cur_xyz, cur_quat = body_pose(
+                        self.tf_buffer,
+                        'left_hand_palm_link',
+                        rot_type='quat')
+                
+                _hands_command_ = np.zeros(6)
+                _hands_command_[0:3] = (dst_xyz - cur_xyz)
+                # q_target @ q_current^{-1}
+                d_quat = quat_mul(
+                    dst_quat,
+                    quat_conjugate(cur_quat)
+                )
+                d_axa = axis_angle_from_quat(d_quat)
+                _hands_command_[3:6] = d_axa
+                print('hands_command', _hands_command_)
 
         # print(_hands_command_)
         # _hands_command_ = np.zeros(6)
@@ -735,7 +820,7 @@ class Controller:
         self.obs[:] = self.obsmap(self.low_state,
                                   self.action,
                                   _hands_command_)
-        # logpath = Path('/tmp/eet3/')
+        # logpath = Path('/tmp/eet8/')
         # logpath.mkdir(parents=True, exist_ok=True)
         # np.save(F'{logpath}/obs{self.counter:03d}.npy',
         #         self.obs)
@@ -756,14 +841,28 @@ class Controller:
             obs_tensor[..., 122:125] = math_utils.quat_rotate(
                 world_from_body_quat[None],
                 obs_tensor[..., 122:125])
-        self.action = self.policy(obs_tensor).detach().numpy().squeeze()
+        if True:
+            self.action = self.policy(obs_tensor).detach().numpy().squeeze()
+
+        if False:
+            non_arm_target = np.load('/tmp/eet5/act064.npy')[0][:22]
+            self.action[..., :22] = non_arm_target
+
         # np.save(F'{logpath}/act{self.counter:03d}.npy',
         #         self.action)
 
         target_dof_pos = self.actmap(
             self.obs,
             self.action,
-            root_state_w[3:7]
+            #root_state_w[3:7]
+        )
+
+        q_mot = np.asarray(
+                [self.low_state.motor_state[i_mot].q for i_mot in range(29)]
+        )
+        target_dof_pos = (
+                0.7 * q_mot +
+                0.3 * target_dof_pos
         )
         # print('??',
         #         target_dof_pos,
@@ -776,14 +875,14 @@ class Controller:
         for i in range(len(self.config.motor_joint)):
             self.low_cmd.motor_cmd[i].q = float(target_dof_pos[i])
             self.low_cmd.motor_cmd[i].dq = 0.0
-            self.low_cmd.motor_cmd[i].kp = 1.0 * float(self.config.kps[i])
-            self.low_cmd.motor_cmd[i].kd = 1.0 * float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].kp = 0.5 * float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = 0.5 * float(self.config.kds[i])
             self.low_cmd.motor_cmd[i].tau = 0.0
 
         # reduce KP for non-arm joints
         for i in self.mot_from_nonarm:
-            self.low_cmd.motor_cmd[i].kp = 0.05 * float(self.config.kps[i])
-            self.low_cmd.motor_cmd[i].kd = 0.05 * float(self.config.kds[i])
+            self.low_cmd.motor_cmd[i].kp = 0.2 * float(self.config.kps[i])
+            self.low_cmd.motor_cmd[i].kd = 0.2 * float(self.config.kds[i])
 
         # send the command
         self.send_cmd(self.low_cmd)
