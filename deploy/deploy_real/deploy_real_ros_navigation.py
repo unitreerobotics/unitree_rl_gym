@@ -37,94 +37,6 @@ class Mode(Enum):
     null = 5
 
 
-axis_angle_from_quat = math_utils.as_np(math_utils.axis_angle_from_quat)
-quat_conjugate = math_utils.as_np(math_utils.quat_conjugate)
-quat_mul = math_utils.as_np(math_utils.quat_mul)
-quat_rotate = math_utils.as_np(math_utils.quat_rotate)
-quat_rotate_inverse = math_utils.as_np(math_utils.quat_rotate_inverse)
-wrap_to_pi = math_utils.as_np(math_utils.wrap_to_pi)
-combine_frame_transforms = math_utils.as_np(
-    math_utils.combine_frame_transforms)
-
-# Create a mapping tensor
-# mapping_tensor = torch.zeros((len(sim_b_joints), len(sim_a_joints)), device=env.device)
-
-
-def body_pose(
-        tf_buffer,
-        frame: str,
-        ref_frame: str = 'pelvis',
-        stamp=None,
-        rot_type: str = 'axa'):
-    """ --> tf does not exist """
-    if stamp is None:
-        stamp = rp.time.Time()
-    try:
-        # t = "ref{=pelvis}_from_frame" transform
-        t = tf_buffer.lookup_transform(
-            ref_frame,  # to
-            frame,  # from
-            stamp)
-    except TransformException as ex:
-        print(f'Could not transform {frame} to {ref_frame}: {ex}')
-        raise
-
-    txn = t.transform.translation
-    rxn = t.transform.rotation
-
-    xyz = np.array([txn.x, txn.y, txn.z])
-    quat_wxyz = np.array([rxn.w, rxn.x, rxn.y, rxn.z])
-
-    xyz = np.array(xyz)
-    if rot_type == 'axa':
-        axa = axis_angle_from_quat(quat_wxyz)
-        axa = wrap_to_pi(axa)
-        return (xyz, axa)
-    elif rot_type == 'quat':
-        return (xyz, quat_wxyz)
-    raise ValueError(f"Unknown rot_type: {rot_type}")
-
-
-from common.xml_helper import extract_link_data
-
-
-def compute_com(tf_buffer, body_frames: List[str]):
-    """compute com of body frames"""
-    mass_list = []
-    com_list = []
-
-    # bring default values
-    com_data = extract_link_data(
-        '../../resources/robots/g1_description/g1_29dof_rev_1_0.xml')
-
-    # iterate for frames
-    for frame in body_frames:
-        try:
-            frame_data = com_data[frame]
-        except KeyError:
-            continue
-
-        try:
-            link_pos, link_wxyz = body_pose(tf_buffer,
-                                            frame, rot_type='quat')
-        except TransformException:
-            continue
-
-        com_pos_b, com_wxyz = frame_data['pos'], frame_data['quat']
-
-        # compute com from world coordinates
-        # NOTE 'math_utils' package will be brought from isaaclab
-        com_pos = link_pos + quat_rotate(link_wxyz, com_pos_b)
-        com_list.append(com_pos)
-
-        # get math
-        mass = frame_data['mass']
-        mass_list.append(mass)
-
-    com = sum([m * pos for m, pos in zip(mass_list, com_list)]) / sum(mass_list)
-    return com
-
-
 def index_map(k_to, k_from):
     """
     Returns an index mapping from k_from to k_to.
@@ -226,6 +138,8 @@ class Controller:
             if b_joint in config.lab_joint:
                 a_idx = config.lab_joint.index(b_joint)
                 self.mapping_tensor[a_idx, b_idx] = 1.0
+
+        self.mot_from_lab = index_map(config.motor_joint, config.lab_joint)
         
         self.remote_controller = RemoteController()
 
@@ -248,21 +162,6 @@ class Controller:
         self.obsmap = Observation(
             '../../resources/robots/g1_description/g1_29dof_with_hand_rev_1_0.urdf',
             config, self.tf_buffer)
-        # FIXME(ycho): give `root_state_w`
-
-        if True:
-            q_mot = np.array(config.default_angles)
-            q_pin = np.zeros_like(self.ikctrl.cfg.q)
-            q_pin[self.pin_from_mot] = q_mot
-            default_pose = self.ikctrl.fk(q_pin)
-            xyz = default_pose.translation
-            quat_wxyz = xyzw2wxyz(
-                pin.Quaternion(
-                    default_pose.rotation).coeffs())
-            self.default_pose_b = np.concatenate([xyz, quat_wxyz])
-            # self.target_pose = np.copy(self.default_pose_b)
-            self.target_pose = None
-            # print('default_pose', self.default_pose_b)
 
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
@@ -436,8 +335,11 @@ class Controller:
 
         self.action = self.policy(obs_tensor).detach().numpy().squeeze()
 
-        self.action = self.action @ self.mapping_tensor.detach().cpu().numpy()
-        target_dof_pos = self.config.default_angles + self.action * self.config.action_scale
+        action = np.zeros_like(self.action,
+                          dtype=np.float32)
+        action[self.mot_from_lab] = self.action
+
+        target_dof_pos = self.config.default_angles + action * self.config.action_scale
 
         # Build low cmd
         for i in range(len(self.config.motor_joint)):
@@ -446,11 +348,6 @@ class Controller:
             self.low_cmd.motor_cmd[i].kp = 1.0 * float(self.config.kps[i])
             self.low_cmd.motor_cmd[i].kd = 1.0 * float(self.config.kds[i])
             self.low_cmd.motor_cmd[i].tau = 0.0
-
-        # reduce KP for non-arm joints
-        # for i in self.mot_from_nonarm:
-        #     self.low_cmd.motor_cmd[i].kp = 0.05 * float(self.config.kps[i])
-        #     self.low_cmd.motor_cmd[i].kd = 0.05 * float(self.config.kds[i])
 
         # send the command
         self.send_cmd(self.low_cmd)
