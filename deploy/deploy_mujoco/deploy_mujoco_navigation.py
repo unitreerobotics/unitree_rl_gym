@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 position = d.qpos[:3]
                 # position is given on world frame.
                 # ic(position)
-                ic(cmd)
+                # ic(cmd)
                 cmd[0] = target_cmd[0] - position[0]
                 cmd[1] = target_cmd[1] - position[1]
                 # cmd[2] -= position[2]
