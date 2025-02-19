@@ -7,7 +7,7 @@ imu_type: "pelvis"    # "torso" or "pelvis"
 lowcmd_topic: "rt/lowcmd"
 lowstate_topic: "rt/lowstate"
 
-policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/policy.pt"
+policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/step_policy.pt"
 
 leg_joint2motor_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 joint2motor_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
