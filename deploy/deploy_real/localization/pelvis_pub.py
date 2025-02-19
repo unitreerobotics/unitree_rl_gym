@@ -70,7 +70,7 @@ class PelvistoTrack(Node):
         self.static_tf_broadcaster = StaticTransformBroadcaster(self)
 
         # Timer for dynamic transform broadcasting (e.g., pelvis tracking)
-        self.timer = self.create_timer(0.05, self.on_timer)
+        self.timer = self.create_timer(0.01, self.on_timer)
         # One-shot timer to check & publish the static transform after a short delay
         self.static_tf_timer = self.create_timer(1.0, self.publish_static_tf)
 

@@ -53,7 +53,7 @@ def quat_conjugate(q: np.ndarray) -> np.ndarray:
     """
     shape = q.shape
     q = q.reshape(-1, 4)
-    return np.concatenate((q[:, 0:1], -q[:, 1:]), dim=-1).reshape(shape)
+    return np.concatenate((q[:, 0:1], -q[:, 1:]), axis=-1).reshape(shape)
 
 
 def quat_inv(q: np.ndarray) -> np.ndarray:
@@ -193,14 +193,14 @@ def axis_angle_from_quat(quat: np.ndarray, eps: float = 1.0e-6) -> np.ndarray:
     # When theta = 0, (sin(theta/2) / theta) is undefined
     # However, as theta --> 0, we can use the Taylor approximation 1/2 - theta^2 / 48
     quat = quat * (1.0 - 2.0 * (quat[..., 0:1] < 0.0))
-    mag = np.linalg.norm(quat[..., 1:], dim=-1)
-    half_angle = torch.arctan2(mag, quat[..., 0])
+    mag = np.linalg.norm(quat[..., 1:], axis=-1)
+    half_angle = np.arctan2(mag, quat[..., 0])
     angle = 2.0 * half_angle
     # check whether to apply Taylor approximation
     sin_half_angles_over_angles = np.where(
-        angle.abs() > eps, np.sin(half_angle) / angle, 0.5 - angle * angle / 48
+        np.abs(angle) > eps, np.sin(half_angle) / angle, 0.5 - angle * angle / 48
     )
-    return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
+    return quat[..., 1:4] / sin_half_angles_over_angles[..., None]
 
 def wrap_to_pi(angles: np.ndarray) -> np.ndarray:
     r"""Wraps input angles (in radians) to the range :math:`[-\pi, \pi]`.

@@ -56,8 +56,8 @@ class StepCommand:
         """
         self.next_ctarget_left = current_left_pose.copy()
         self.next_ctarget_right = current_right_pose.copy()
-        self.next_ctime_left = 0.8
-        self.next_ctime_right = 1.2
+        self.next_ctime_left = 0.4
+        self.next_ctime_right = 0.4
         self.delta_ctime = 0.4  # Fixed time delta for a new step
         self.max_range = {
             'x_range': (-0.2, 0.2),
@@ -128,7 +128,7 @@ class StepCommand:
         # Compute relative steps using the internal methods.
         relstep_left = self.compute_relstep_left(lx, ly, rx)
         relstep_right = self.compute_relstep_right(lx, ly, rx)
-        from icecream import ic
+        # from icecream import ic
 
         # Update left foot target if its scheduled time has elapsed.
         if count > self.next_ctime_left:
@@ -155,9 +155,9 @@ class StepCommand:
             self.next_ctarget_right[3:7] = new_quat
 
         # Return the concatenated target: left (7D) followed by right (7D).
-        return (np.concatenate((self.next_ctarget_left, self.next_ctarget_right)),
+        return (self.next_ctarget_left, self.next_ctarget_right,
                 (self.next_ctime_left - count), 
-                (self.next_ctarget_right - count))
+                (self.next_ctime_right - count))
 
 
 

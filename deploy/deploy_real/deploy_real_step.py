@@ -132,6 +132,8 @@ class Controller:
         self._step_command = None
         self._saved = False
 
+        self._cur_time = None
+
         if config.msg_type == "hg":
             # g1 and h1_2 use the hg msg type
             self.low_cmd = unitree_hg_msg_dds__LowCmd_()
@@ -269,27 +271,27 @@ class Controller:
         left_tf.header.stamp = self._node.get_clock().now().to_msg()
         left_tf.header.frame_id = 'world'
         left_tf.child_frame_id = 'left_ctarget'
-        left_tf.transform.translation.x = next_ctarget_left[0]
-        left_tf.transform.translation.y = next_ctarget_left[1]
-        left_tf.transform.translation.z = next_ctarget_left[2]
+        left_tf.transform.translation.x = float(next_ctarget_left[0])
+        left_tf.transform.translation.y = float(next_ctarget_left[1])
+        left_tf.transform.translation.z = float(next_ctarget_left[2])
 
-        left_tf.transform.rotation.x = next_ctarget_left[4]
-        left_tf.transform.rotation.y = next_ctarget_left[5]
-        left_tf.transform.rotation.z = next_ctarget_left[6]
-        left_tf.transform.rotation.w = next_ctarget_left[3]
+        left_tf.transform.rotation.x = float(next_ctarget_left[4])
+        left_tf.transform.rotation.y = float(next_ctarget_left[5])
+        left_tf.transform.rotation.z = float(next_ctarget_left[6])
+        left_tf.transform.rotation.w = float(next_ctarget_left[3])
 
         right_tf = TransformStamped()
         right_tf.header.stamp = left_tf.header.stamp
         right_tf.header.frame_id = 'world'
         right_tf.child_frame_id = 'right_ctarget'
-        right_tf.transform.translation.x = next_ctarget_right[0]
-        right_tf.transform.translation.y = next_ctarget_right[1]
-        right_tf.transform.translation.z = next_ctarget_right[2]
+        right_tf.transform.translation.x = float(next_ctarget_right[0])
+        right_tf.transform.translation.y = float(next_ctarget_right[1])
+        right_tf.transform.translation.z = float(next_ctarget_right[2])
 
-        right_tf.transform.rotation.x = next_ctarget_right[4]
-        right_tf.transform.rotation.y = next_ctarget_right[5]
-        right_tf.transform.rotation.z = next_ctarget_right[6]
-        right_tf.transform.rotation.w = next_ctarget_right[3]
+        right_tf.transform.rotation.x = float(next_ctarget_right[4])
+        right_tf.transform.rotation.y = float(next_ctarget_right[5])
+        right_tf.transform.rotation.z = float(next_ctarget_right[6])
+        right_tf.transform.rotation.w = float(next_ctarget_right[3])
 
         self.tf_broadcaster.sendTransform(left_tf)
         self.tf_broadcaster.sendTransform(right_tf)
@@ -317,16 +319,46 @@ class Controller:
                                                             ctarget_right_b_quat)
         return np.concatenate((pos_delta_left, axa_delta_left, pos_delta_right, axa_delta_right), axis=0)
 
+    def run_wrapper(self):
+        t = time.time()
+        if self._cur_time is None:
+            self._cur_time = 0.0
+        if not self._saved:
+            while True:
+                rp.spin_once(self._node)
+                try:
+                    current_left_tf = self.tf_buffer.lookup_transform( 
+                                    "world",
+                                    "left_ankle_roll_link", 
+                                    rp.time.Time(),
+                                    rp.duration.Duration(seconds=0.02))
+                    break
+                except Exception as ex:
+                    print(ex)
+                time.sleep(0.05)
+        if t- self._cur_time > self.config.control_dt:
+            self.run()
+            self._cur_time = t
+
+        time.sleep(self.config.control_dt/10)
+
+
     def run(self):
         if self._step_command is None:
 
-            current_left_tf = self.tf_buffer.lookup_transform("world", 
-                                    "left_foot", rclpy.time.Time())
+            current_left_tf = self.tf_buffer.lookup_transform( 
+                                    "world",
+                                    "left_ankle_roll_link", 
+                                    rp.time.Time(),
+                                    rp.duration.Duration(seconds=0.02))
             current_left_pose = self.tf_to_pose(current_left_tf, 'wxyz')
             current_left_pose[2] = 0.0
             current_left_pose[3:7] = yaw_quat(current_left_pose[3:7])
-            current_right_tf = self.tf_buffer.lookup_transform("world",
-                                    "right_foot", rclpy.time.Time())
+            current_right_tf = self.tf_buffer.lookup_transform(
+                                    "world",
+                                    "right_ankle_roll_link", 
+                                    rp.time.Time(),
+                                    rp.duration.Duration(seconds=0.02))
             current_right_pose = self.tf_to_pose(current_right_tf, 'wxyz')
             current_right_pose[2] = 0.0
             current_right_pose[3:7] = yaw_quat(current_right_pose[3:7])
@@ -371,27 +403,32 @@ class Controller:
         ang_vel = ang_vel * self.config.ang_vel_scale
         
         # foot pose
-        left_foot_from_base_tf = self.tf_buffer.lookup_transform("pelvis", 
+        left_foot_from_base_tf = self.tf_buffer.lookup_transform( 
+                                                "pelvis",
                                                 "left_ankle_roll_link",
-                                                rclpy.time.Time())
-        right_foot_from_base_tf = self.tf_buffer.lookup_transform("pelvis",
+                                                rp.time.Time())
+        right_foot_from_base_tf = self.tf_buffer.lookup_transform(
+                                                "pelvis",
                                                 "right_ankle_roll_link",
-                                                rclpy.time.Time())
+                                                rp.time.Time())
+        print(left_foot_from_base_tf, right_foot_from_base_tf)
         lf_b = self.tf_to_pose(left_foot_from_base_tf, 'wxyz')
         rf_b = self.tf_to_pose(right_foot_from_base_tf, 'wxyz')
         left_foot_axa = wrap_to_pi(axis_angle_from_quat(lf_b[3:7]))
         right_foot_axa = wrap_to_pi(axis_angle_from_quat(rf_b[3:7]))
-        rel_foot = np.concatenate((left_foot_from_base[:3],
-                                    right_foot_from_base[:3], 
+        rel_foot = np.concatenate((lf_b[:3],
+                                    rf_b[:3], 
                                     left_foot_axa,
                                     right_foot_axa), axis=0)
         # hand pose
-        left_hand_from_base_tf = self.tf_buffer.lookup_transform("pelvis",
+        left_hand_from_base_tf = self.tf_buffer.lookup_transform(
+                                                "pelvis",
                                                 "left_rubber_hand",
-                                                rclpy.time.Time())
-        right_hand_from_base_tf = self.tf_buffer.lookup_transform("pelvis",
+                                                rp.time.Time())
+        right_hand_from_base_tf = self.tf_buffer.lookup_transform(
+                                                "pelvis",
                                                 "right_rubber_hand",
-                                                rclpy.time.Time())
+                                                rp.time.Time())
         left_hand_from_base = self.tf_to_pose(left_hand_from_base_tf, 'wxyz')
         right_hand_from_base = self.tf_to_pose(right_hand_from_base_tf, 'wxyz')
         left_hand_axa = wrap_to_pi(axis_angle_from_quat(left_hand_from_base[3:7]))
@@ -401,14 +438,16 @@ class Controller:
                                     left_hand_axa,
                                     right_hand_axa), axis=0)
         # foot command
-        base_pose_w = self.tf_to_pose(self.tf_buffer.lookup_transform("world", "pelvis",
-                                        rclpy.time.Time()), 'wxyz')
+        base_pose_w = self.tf_to_pose(self.tf_buffer.lookup_transform(
+            "world", "pelvis",
+                                        rp.time.Time()), 'wxyz')
         step_command = self.get_command(base_pose_w,
                         lf_b,
                         rf_b,
-                        ctarget_left_w,
-                        ctarget_right_w)
-        step_command = np.concatenate((step_command, dt_left, dt_right), axis=0)
+                        next_ctarget_left,
+                        next_ctarget_right)
+        step_command = np.concatenate((step_command, 
+                            np.asarray([dt_left, dt_right])), axis=0)
 
         num_actions = self.config.num_actions
         self.obs[:3] = ang_vel
@@ -470,8 +509,6 @@ class Controller:
 
         # send the command
         self.send_cmd(self.low_cmd)
-
-        time.sleep(self.config.control_dt)
         
     def clear(self):
         self._node.destroy_node()
@@ -506,7 +543,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            controller.run()
+            controller.run_wrapper()
             # Press the select key to exit
             if controller.remote_controller.button[KeyMap.select] == 1:
                 break
