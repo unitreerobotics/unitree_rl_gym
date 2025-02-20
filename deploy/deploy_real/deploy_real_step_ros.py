@@ -194,7 +194,7 @@ class Controller:
             self.send_cmd(self.low_cmd)
             self._node.destroy_node()
             rp.shutdown()
-            torch.save(torch.cat(self._obs_buf, dim=0), "obs5.pt")
+            torch.save(torch.cat(self._obs_buf, dim=0), "obs6.pt")
             print("Exit")
 
     def LowStateHgHandler(self, msg: LowStateHG):
@@ -239,12 +239,13 @@ class Controller:
         self.counter = 0
         self._num_step = int(total_time / self.config.control_dt)
         
-        dof_idx = self.config.leg_joint2motor_idx + self.config.arm_waist_joint2motor_idx
-        kps = self.config.kps + self.config.arm_waist_kps
-        kds = self.config.kds + self.config.arm_waist_kds
+        dof_idx = self.config.joint2motor_idx
+        kps = self.config.kps 
+        kds = self.config.kds 
         self._kps = [float(kp) for kp in kps]
         self._kds = [float(kd) for kd in kds]
-        self._default_pos = np.concatenate((self.config.default_angles, self.config.arm_waist_target), axis=0)
+        self._default_pos = np.asarray(self.config.default_angles)
+        # np.concatenate((self.config.default_angles), axis=0)
         self._dof_size = len(dof_idx)
         self._dof_idx = dof_idx
         
@@ -275,16 +276,9 @@ class Controller:
 
     def default_pos_state(self):
         if self.remote_controller.button[KeyMap.A] != 1:
-            for i in range(len(self.config.leg_joint2motor_idx)):
-                motor_idx = self.config.leg_joint2motor_idx[i]
+            for i in range(len(self.config.joint2motor_idx)):
+                motor_idx = self.config.joint2motor_idx[i]
                 self.low_cmd.motor_cmd[motor_idx].q = float(self.config.default_angles[i])
-                self.low_cmd.motor_cmd[motor_idx].dq = 0.0
-                self.low_cmd.motor_cmd[motor_idx].kp = self._kps[i]
-                self.low_cmd.motor_cmd[motor_idx].kd = self._kds[i]
-                self.low_cmd.motor_cmd[motor_idx].tau = 0.0
-            for i in range(len(self.config.arm_waist_joint2motor_idx)):
-                motor_idx = self.config.arm_waist_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = float(self.config.arm_waist_target[i])
                 self.low_cmd.motor_cmd[motor_idx].dq = 0.0
                 self.low_cmd.motor_cmd[motor_idx].kp = self._kps[i]
                 self.low_cmd.motor_cmd[motor_idx].kd = self._kds[i]
@@ -388,9 +382,9 @@ class Controller:
         next_ctarget_left, next_ctarget_right, dt_left, dt_right = next_ctarget
         self.publish_step_command(next_ctarget_left, next_ctarget_right)
         
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            self.qj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].q
-            self.dqj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].dq
+        for i in range(len(self.config.joint2motor_idx)):
+            self.qj[i] = self.low_state.motor_state[self.config.joint2motor_idx[i]].q
+            self.dqj[i] = self.low_state.motor_state[self.config.joint2motor_idx[i]].dq
 
         # imu_state quaternion: w, x, y, z
         quat = self.low_state.imu_state.quaternion
@@ -451,7 +445,7 @@ class Controller:
         base_pose_w = self.tf_to_pose(self.tf_buffer.lookup_transform(
             "world", "pelvis",
                                         rp.time.Time()), 'wxyz')
-        # dt_left = dt_right = 0.0
+        dt_left = dt_right = 0.0
         step_command = self.get_command(base_pose_w,
                         lf_b,
                         rf_b,
@@ -487,7 +481,7 @@ class Controller:
         self.action = self.action @ mapping_tensor.detach().cpu().numpy()
 
         # transform action to target_dof_pos
-        target_dof_pos = self.config.default_angles + self.action * self.config.action_scale * 0.7
+        target_dof_pos = self.config.default_angles + self.action * self.config.action_scale *0.8
 
         # Build low cmd
         if True:
