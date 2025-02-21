@@ -30,6 +30,81 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     # get config file name from command line
+    isaaclab_joint_order = [
+        'left_hip_pitch_joint',
+        'right_hip_pitch_joint',
+        'waist_yaw_joint',
+        'left_hip_roll_joint',
+        'right_hip_roll_joint',
+        'waist_roll_joint',
+        'left_hip_yaw_joint',
+        'right_hip_yaw_joint',
+        'waist_pitch_joint',
+        'left_knee_joint',
+        'right_knee_joint',
+        'left_shoulder_pitch_joint',
+        'right_shoulder_pitch_joint',
+        'left_ankle_pitch_joint',
+        'right_ankle_pitch_joint',
+        'left_shoulder_roll_joint',
+        'right_shoulder_roll_joint',
+        'left_ankle_roll_joint',
+        'right_ankle_roll_joint',
+        'left_shoulder_yaw_joint',
+        'right_shoulder_yaw_joint',
+        'left_elbow_joint',
+        'right_elbow_joint',
+        'left_wrist_roll_joint',
+        'right_wrist_roll_joint',
+        'left_wrist_pitch_joint',
+        'right_wrist_pitch_joint',
+        'left_wrist_yaw_joint',
+        'right_wrist_yaw_joint'
+    ]
+
+    raw_joint_order = [
+        'left_hip_pitch_joint',
+        'left_hip_roll_joint',
+        'left_hip_yaw_joint',
+        'left_knee_joint',
+        'left_ankle_pitch_joint',
+        'left_ankle_roll_joint',
+        'right_hip_pitch_joint',
+        'right_hip_roll_joint',
+        'right_hip_yaw_joint',
+        'right_knee_joint',
+        'right_ankle_pitch_joint',
+        'right_ankle_roll_joint',
+        'waist_yaw_joint',
+        'waist_roll_joint',
+        'waist_pitch_joint',
+        'left_shoulder_pitch_joint',
+        'left_shoulder_roll_joint',
+        'left_shoulder_yaw_joint',
+        'left_elbow_joint',
+        'left_wrist_roll_joint',
+        'left_wrist_pitch_joint',
+        'left_wrist_yaw_joint',
+        'right_shoulder_pitch_joint',
+        'right_shoulder_roll_joint',
+        'right_shoulder_yaw_joint',
+        'right_elbow_joint',
+        'right_wrist_roll_joint',
+        'right_wrist_pitch_joint',
+        'right_wrist_yaw_joint'
+    ]
+
+    # Create a mapping tensor
+    # mapping_tensor = torch.zeros((len(sim_b_joints), len(sim_a_joints)), device=env.device)
+    mapping_tensor = torch.zeros((len(raw_joint_order), len(isaaclab_joint_order)))
+
+    # Fill the mapping tensor
+    for b_idx, b_joint in enumerate(raw_joint_order):
+        if b_joint in isaaclab_joint_order:
+            a_idx = isaaclab_joint_order.index(b_joint)
+            # mapping_tensor[b_idx, a_idx] = 1.0
+            mapping_tensor[a_idx, b_idx] = 1.0
+
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -81,6 +156,10 @@ if __name__ == "__main__":
         start = time.time()
         while viewer.is_running() and time.time() - start < simulation_duration:
             step_start = time.time()
+            from icecream import ic
+            # ic(
+            #     target_dof_pos, d.qpos[7:], kps, np.zeros_like(kds), d.qvel[6:], kds
+            # )
             tau = pd_control(target_dof_pos, d.qpos[7:], kps, np.zeros_like(kds), d.qvel[6:], kds)
             d.ctrl[:] = tau
             # mj_step can be replaced with code that also evaluates
@@ -114,12 +193,32 @@ if __name__ == "__main__":
                 obs[9 : 9 + num_actions] = qj
                 obs[9 + num_actions : 9 + 2 * num_actions] = dqj
                 obs[9 + 2 * num_actions : 9 + 3 * num_actions] = action
-                obs[9 + 3 * num_actions : 9 + 3 * num_actions + 2] = np.array([sin_phase, cos_phase])
+                # obs[9 + 3 * num_actions : 9 + 3 * num_actions + 2] = np.array([sin_phase, cos_phase])
                 obs_tensor = torch.from_numpy(obs).unsqueeze(0)
+                obs_tensor[..., 9:38] = obs_tensor[..., 9:38] @ mapping_tensor.transpose(0, 1)
+                obs_tensor[..., 38:67] = obs_tensor[..., 38:67] @ mapping_tensor.transpose(0, 1)
+                obs_tensor[..., 67:96] = obs_tensor[..., 67:96] @ mapping_tensor.transpose(0, 1)
+                # from icecream import ic
+                # ic(
+                    
+                #     obs[..., :9],
+                #     obs[..., 9:38],
+                #     obs[..., 38:67],
+                #     obs[..., 67:96],
+                # )
                 # policy inference
                 action = policy(obs_tensor).detach().numpy().squeeze()
+                # reordered_actions = action @ mapping_tensor.detach().cpu().numpy()
+                action = action @ mapping_tensor.detach().cpu().numpy()
+                # ic(
+                #     action
+                # )
+                # action = 0.
+
                 # transform action to target_dof_pos
+                # target_dof_pos = action * action_scale + default_angles
                 target_dof_pos = action * action_scale + default_angles
+                # raise NotImplementedError
 
             # Pick up changes to the physics state, apply perturbations, update options from GUI.
             viewer.sync()

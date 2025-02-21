@@ -1,4 +1,7 @@
-from legged_gym import LEGGED_GYM_ROOT_DIR
+try:
+    from legged_gym import LEGGED_GYM_ROOT_DIR
+except ModuleNotFoundError:
+    LEGGED_GYM_ROOT_DIR='../..'
 import numpy as np
 import yaml
 
@@ -22,16 +25,51 @@ class Config:
 
             self.policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
 
-            self.leg_joint2motor_idx = config["leg_joint2motor_idx"]
+            if 'leg_joint2motor_idx' in config:
+                self.leg_joint2motor_idx = config["leg_joint2motor_idx"]
+            if 'joint2motor_idx' in config:
+                self.joint2motor_idx = config["joint2motor_idx"]
+            
             self.kps = config["kps"]
             self.kds = config["kds"]
             self.default_angles = np.array(config["default_angles"], dtype=np.float32)
 
-            self.arm_waist_joint2motor_idx = config["arm_waist_joint2motor_idx"]
-            self.arm_waist_kps = config["arm_waist_kps"]
-            self.arm_waist_kds = config["arm_waist_kds"]
-            self.arm_waist_target = np.array(config["arm_waist_target"], dtype=np.float32)
+            if 'arm_waist_joint2motor_idx' in config:
+                self.arm_waist_joint2motor_idx = config["arm_waist_joint2motor_idx"]
+                self.arm_waist_kps = config["arm_waist_kps"]
+                self.arm_waist_kds = config["arm_waist_kds"]
+                self.arm_waist_target = np.array(config["arm_waist_target"], dtype=np.float32)
+            else:
+                self.arm_waist_joint2motor_idx = []
+                self.arm_waist_kps = []
+                self.arm_waist_kds = []
+                self.arm_waist_target = []
 
+            if 'motor_joint' in config:
+                self.motor_joint = config['motor_joint']
+            else:
+                self.motor_joint=[]
+
+            if 'arm_joint' in config:
+                self.arm_joint = config['arm_joint']
+            else:
+                self.arm_joint=[]
+
+            if 'non_arm_joint' in config:
+                self.non_arm_joint = config['non_arm_joint']
+            else:
+                self.non_arm_joint=[]
+
+            if 'lab_joint' in config:
+                self.lab_joint = config['lab_joint']
+            else:
+                self.lab_joint=[]
+                
+            if 'lab_joint_offsets' in config:
+                self.lab_joint_offsets = config['lab_joint_offsets']
+            else:
+                self.lab_joint_offsets=[]
+                
             self.ang_vel_scale = config["ang_vel_scale"]
             self.dof_pos_scale = config["dof_pos_scale"]
             self.dof_vel_scale = config["dof_vel_scale"]
