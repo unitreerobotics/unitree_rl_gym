@@ -26,7 +26,13 @@ from yourdfpy import URDF
 import math_utils
 import random as rd
 from act_to_dof import ActToDof
-
+from common.utils import (to_array, normalize, yaw_quat,
+                        axis_angle_from_quat,
+                        subtract_frame_transforms,
+                        wrap_to_pi,
+                        compute_pose_error,
+                        quat_apply
+                        )
 
 class Mode(Enum):
     wait = 0
@@ -151,6 +157,7 @@ class Controller:
         self.obs = np.zeros(config.num_obs, dtype=np.float32)
         # command : x[m] y[m] z[m] heading[rad]
         self.cmd = np.array([0., 0., 0., 0.]) 
+        self.given_cmd = np.array([0., 0., 0., 0.])
         self.counter = 0
 
         # ROS handles & helpers
@@ -175,6 +182,8 @@ class Controller:
                 LowStateHG, 'lowstate', self.LowStateHgHandler, 10)
             self.mode_pr_ = MotorMode.PR
             self.mode_machine_ = 0
+
+            
 
         elif config.msg_type == "go":
             raise ValueError(f"{config.msg_type} is not implemented yet.")
@@ -312,6 +321,51 @@ class Controller:
         else:
             self._mode_change = True
             self.mode = Mode.policy
+    
+    def tf_to_pose(self, tf, order='xyzw'):
+        pos = to_array(tf.transform.translation)
+        quat = to_array(tf.transform.rotation)
+        if order == 'wxyz':
+            quat = np.roll(quat, 1, axis=-1)
+        return np.concatenate((pos, quat), axis=0)
+    
+    def update_command(self):
+        """update command """
+        # Get controller input, update the target navigation command from the world coordinate
+        pass
+    
+    def get_command(self, base_pose_w):
+        self.update_command()
+        # Get the target navigation command, which is converted to the body coordinate system
+        x_w, y_w, _, heading_w = self.given_cmd
+
+        # Compute xyz navigation goal from body coordinate system
+        """
+        target_vec = self.pos_command_w - self.robot.data.root_pos_w[:, :3]
+        self.pos_command_b[:] = quat_rotate_inverse(
+            yaw_quat(self.robot.data.root_quat_w), target_vec
+        )
+        """
+        xyz_w , quat_w = base_pose_w[:3], base_pose_w[3:]
+        xyz_cmd_w = np.array(x_w - xyz_w[0], y_w - xyz_w[1], 0)
+        xyz_cmd_b = math_utils.quat_rotate_inverse(
+                    math_utils.yaw_quat(torch.as_tensor(quat_w).float().to("cpu")),
+                    torch.as_tensor(xyz_cmd_w).float().to("cpu")
+                ).float().numpy()
+        
+        # Compute heading direction from body coordinate system
+        """
+        forward_w = math_utils.quat_apply(self.root_quat_w, self.FORWARD_VEC_B)
+        return torch.atan2(forward_w[:, 1], forward_w[:, 0])
+
+        self.heading_command_b[:] = wrap_to_pi(
+            self.heading_command_w - self.robot.data.heading_w
+        )
+        """
+        robot_forward_vec_w = quat_apply(quat_w, torch.tensor([1,0,0]).float().to("cpu"))
+        robot_heading_w = torch.atan2(robot_forward_vec_w[:, 1], robot_forward_vec_w[:, 0])
+        heading_command_b = wrap_to_pi(heading_w - robot_heading_w)
+        return np.concatenate(xyz_cmd_b, heading_command_b)
 
     def run_policy(self):
         if self.remote_controller.button[KeyMap.select] == 1:
@@ -320,10 +374,11 @@ class Controller:
             return
         self.counter += 1
 
-        # self.cmd[0] = x
-        # self.cmd[1] = y
-        # self.cmd[2] = z
-        # self.cmd[3] = heading
+        base_pose_w = self.tf_to_pose(self.tf_buffer.lookup_transform(
+            "world", "pelvis",
+            rp.time.Time()), 'wxyz')
+        
+        self.cmd = self.get_command(base_pose_w)
 
         self.obs[:] = self.obsmap(self.low_state,
                                   self.action,
