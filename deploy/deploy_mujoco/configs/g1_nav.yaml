@@ -1,7 +1,7 @@
 # 
 # policy_path: "{LEGGED_GYM_ROOT_DIR}/deploy/pre_train/g1/motion.pt"
 # policy_path: "{LEGGED_GYM_ROOT_DIR}/logs/g1/walk_with_dr_test_v21/exported/policy.pt"
-policy_path: "{LEGGED_GYM_ROOT_DIR}/policies/2025-02-16_22-42-31/policy.pt"
+policy_path: "{LEGGED_GYM_ROOT_DIR}/policies/navigation_less_obs/policy.pt"
 # xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/g1_description/scene.xml"
 xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/g1_description/g1_29dof_rev_1_0.xml"
 

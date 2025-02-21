@@ -127,6 +127,12 @@ if __name__ == "__main__":
                     torch.as_tensor(cmd[:3]).float().to("cpu")
                 ).float().numpy()
 
+                robot_forward_vec_w = math_utils.quat_apply(torch.as_tensor(quat).float().to("cpu"), torch.tensor([1,0,0]).float().to("cpu"))
+                robot_heading_w = torch.atan2(robot_forward_vec_w[1], robot_forward_vec_w[0])
+                cmd[3] = math_utils.wrap_to_pi(cmd[3] - robot_heading_w)
+
+                ic(cmd)
+
 
                 qj = (qj - default_angles) * dof_pos_scale
                 dqj = dqj * dof_vel_scale
