@@ -365,7 +365,7 @@ class Controller:
         robot_forward_vec_w = quat_apply(quat_w, torch.tensor([1,0,0]).float().to("cpu"))
         robot_heading_w = torch.atan2(robot_forward_vec_w[:, 1], robot_forward_vec_w[:, 0])
         heading_command_b = wrap_to_pi(heading_w - robot_heading_w)
-        return np.concatenate(xyz_cmd_b, heading_command_b)
+        return np.append(xyz_cmd_b, heading_command_b)
 
     def run_policy(self):
         if self.remote_controller.button[KeyMap.select] == 1:
