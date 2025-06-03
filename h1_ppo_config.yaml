@@ -1,0 +1,103 @@
+params:
+  seed: ${resolve_default:42,${...seed}} # Allow seed to be overridden by command line, default 42
+
+  algo:
+    name: ppo
+
+  model:
+    name: actor_critic # Standard actor-critic model
+
+  network:
+    name: actor_critic # Corresponds to model.name
+    separate: False # Whether to use separate networks for actor and critic
+
+    space:
+      continuous:
+        mu_activation: None # For continuous actions, linear output for mu
+        sigma_activation: None # For continuous actions, often identity or softplus depending on fixed_sigma
+        mu_init:
+          name: default # Orthogonal initialization with gain sqrt(2)
+        sigma_init:
+          name: const_initializer
+          val: 0 # Start with small exploration noise std for actions (will be exp(0) if fixed_sigma is False and output is log_std)
+                # If fixed_sigma is True, this value is the std. Let's make it small but not zero.
+                # val: 0.1
+        fixed_sigma: True # If true, sigma is a learnable parameter, not network output. Set to true for this config.
+
+    mlp: # Define the MLP structure for both actor and critic
+      units: [256, 128, 64] # Hidden layer sizes, e.g., from H1RoughCfgPPO or common practice
+      activation: elu # Activation function
+      d2rl: False # Asymmetric actor-critic (not used here)
+
+      initializer:
+        name: default # Default (orthogonal)
+      regularizer:
+        name: None # No regularization
+
+    # Uncomment and configure if using RNN (model.name should be 'recurrent_actor_critic')
+    # rnn:
+    #   name: lstm
+    #   units: 128 # RNN hidden size
+    #   layers: 1 # Number of RNN layers
+    #   before_mlp: True # If RNN is before MLP layers (usually True)
+    #   concat_input: False # If input is concatenated to RNN output
+
+  load_checkpoint: ${resolve_default:False,${if:${...checkpoint},True,False}} # Load if checkpoint path is provided
+  load_path: ${...checkpoint} # Path to checkpoint, e.g., runs/H1_IsaacLab_PPO/nn/H1_IsaacLab_PPO.pth
+
+  config:
+    name: ${resolve_default:H1_IsaacLab_PPO,${....experiment}} # Experiment name, can be overridden
+    env_name: H1IsaacLab # Environment name (rl_games will get env from runner)
+    multi_gpu: False # Set to True if using multi-GPU
+    ppo: True # Using PPO
+    mixed_precision: False # Enable mixed precision training if desired
+    bounds_loss_coef: 0.0001 # Coefficient for action bounds loss (push actions into -1, 1 range)
+
+    # PPO specific parameters
+    gamma: 0.99
+    lam: 0.95
+    # tau: 0.95 # Not used in PPO (it's for Polyak averaging in DDPG/SAC)
+    learning_rate: 3.e-4 # Common learning rate for PPO
+    lr_schedule: adaptive # 'adaptive' or 'linear' (adaptive is common for PPO)
+    kl_threshold: 0.016 # KL divergence threshold for adaptive LR schedule
+    score_to_win: 20000 # Arbitrary high score for "solving"
+    max_epochs: 1000 # Max training epochs (e.g., 1000-5000 for a PoC, depends on complexity)
+    minibatch_size: 2048 # (num_envs * horizon_length) / num_minibatches. E.g. (4096 * 24) / 48 = 2048
+    mini_epochs: 8 # Number of PPO optimization epochs per data collection phase (H1RoughCfgPPO: 5)
+    critic_coef: 1.0 # Weight for critic loss (H1RoughCfgPPO: H1RoughCfg.algorithm.value_loss_coef)
+    clip_value: True # Clip value function losses
+    truncate_grads: True # Clip gradients by norm
+    grad_norm: 1.0 # Gradient norm clipping threshold
+    entropy_coef: 0.005 # Entropy bonus coefficient (H1RoughCfgPPO.algorithm.entropy_coef)
+    actor_loss_coef: 1.0 # Weight for actor loss
+    # c_loss_coef: 1.0 # This is usually critic_coef, not a separate parameter in rl_games
+
+    horizon_length: 24 # Number of steps collected per environment per update (H1RoughCfgPPO: 24)
+    normalize_input: True # Normalize observations (running mean/std)
+    normalize_value: True # Normalize value function target (running mean/std)
+    num_actors: ${....task.env.numEnvs} # Number of environments (should match Isaac Lab env)
+    # max_steps_per_episode: 0 # If using a fixed episode length from environment, set by env.
+
+    # For Isaac Lab integration, rl_games needs info on how to get the environment
+    # This is often handled by the runner script passing the environment factory.
+    env_config:
+      # This will be the name of the task registered with Isaac Lab's helper utilities
+      # or the name passed to the runner.
+      name: ${resolve_default:H1_IsaacLab,${....task.name}} # Should resolve to H1_IsaacLab or similar
+      # Other env-specific params for rl_games if needed, but usually Isaac Lab handles this.
+      # For example, if the environment needs specific params from rl_games side:
+      # some_env_param_from_rl_games: value
+
+    player: # Player settings for inference/evaluation (not used during training itself)
+      # render: ${resolve_default:False,${....headless}} # Invert headless for rendering
+      # games_num: 100
+      # print_stats: True
+      # deterministic: True
+      # checkpoint: ${....checkpoint} # Load specific checkpoint for player
+      # episodes_num: 10 # Number of episodes to play
+      # num_actors: 1 # Usually run player on a single environment
+      # # Other player specific settings...
+      # # render_sleep: 0.016 # if rendering too fast
+      # # evaluate: True # if player is used for evaluation during training
+      # # eval_freq: 100 # how often to evaluate
+      # # eval_games_num: 10 # number of games for evaluation
