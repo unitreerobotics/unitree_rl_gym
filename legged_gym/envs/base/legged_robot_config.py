@@ -41,7 +41,8 @@ class LeggedRobotCfg(BaseConfig):
         max_curriculum = 1.
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
-        heading_command = True # if true: compute ang vel command from heading error
+        # heading_command = True # if true: compute ang vel command from heading error
+        heading_command = False # if true: compute ang vel command from heading error
         class ranges:
             lin_vel_x = [-1.0, 1.0] # min max [m/s]
             lin_vel_y = [-1.0, 1.0]   # min max [m/s]
@@ -86,7 +87,8 @@ class LeggedRobotCfg(BaseConfig):
         linear_damping = 0.
         max_angular_velocity = 1000.
         max_linear_velocity = 1000.
-        armature = 0.
+        # armature = 0.
+        armature = 0.01
         thickness = 0.01
 
     class domain_rand:
@@ -126,10 +128,13 @@ class LeggedRobotCfg(BaseConfig):
 
     class normalization:
         class obs_scales:
-            lin_vel = 2.0
-            ang_vel = 0.25
+            # lin_vel = 2.0
+            lin_vel = 1.0
+            # ang_vel = 0.25
+            ang_vel = 1.0
             dof_pos = 1.0
-            dof_vel = 0.05
+            # dof_vel = 0.05
+            dof_vel = 1.0
             height_measurements = 5.0
         clip_observations = 100.
         clip_actions = 100.
