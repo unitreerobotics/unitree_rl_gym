@@ -154,19 +154,12 @@ First, navigate to the directory above.
 cd deploy/deploy_real/cpp_g1
 ```
 
-The C++ implementation depends on the LibTorch library, You must download and extract LibTorch in the `deploy/deploy_real/cpp_g1` directory. Download links are available at: [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/)
+The C++ implementation depends on the LibTorch library, download the LibTorch
 
-Please download the c++, stable version of LibTorch.
-
-The LibTorch version used in this project (2.7.1 CPU) may differ from your downloaded version. To ensure compatibility:
-
-1. **Verify Your LibTorch Version**  
-   Check your downloaded LibTorch directory name (e.g., `libtorch-cxx11-abi-shared-with-deps-[YOUR_VERSION]`)
-
-2. **Update CMake Configuration**  
-   Modify this line in `CMakeLists.txt`:
-   ```cmake
-   set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/libtorch-cxx11-abi-shared-with-deps-2.7.1+cpu/libtorch/share/cmake")
+```bash
+wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.7.1%2Bcpu.zip
+unzip libtorch-cxx11-abi-shared-with-deps-2.7.1+cpu.zip
+```
 
 To build the project, executable the following steps
 
