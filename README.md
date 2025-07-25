@@ -128,6 +128,7 @@ Before deploying to the physical robot, ensure it’s in debug mode. Detailed st
 python deploy/deploy_real/deploy_real.py {net_interface} {config_name}
 ```
 
+
 #### Parameter Description
 - `net_interface`: Network card name connected to the robot, e.g., `enp3s0`.
 - `config_name`: Configuration file located in `deploy/deploy_real/configs/`, e.g., `g1.yaml`, `h1.yaml`, `h1_2.yaml`.
@@ -139,6 +140,43 @@ python deploy/deploy_real/deploy_real.py {net_interface} {config_name}
 | [![real_g1](https://oss-global-cdn.unitree.com/static/78c61459d3ab41448cfdb31f6a537e8b.GIF)](https://oss-global-cdn.unitree.com/static/0818dcf7a6874b92997354d628adcacd.mp4) | [![real_h1](https://oss-global-cdn.unitree.com/static/fa07b2fd2ad64bb08e6b624d39336245.GIF)](https://oss-global-cdn.unitree.com/static/ea0084038d384e3eaa73b961f33e6210.mp4) | [![real_h1_2](https://oss-global-cdn.unitree.com/static/a88915e3523546128a79520aa3e20979.GIF)](https://oss-global-cdn.unitree.com/static/12d041a7906e489fae79d55b091a63dd.mp4) |
 
 ---
+
+#### Deploy with C++
+There is also an example of deploying the G1 pre-trained model in C++. the C++ code is located in the following directory.
+
+```
+deploy/deploy_real/cpp_g1
+```
+
+First, navigate to the directory above.
+
+```base
+cd deploy/deploy_real/cpp_g1
+```
+
+The C++ implementation depends on the LibTorch library, download the LibTorch
+
+```bash
+wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.7.1%2Bcpu.zip
+unzip libtorch-cxx11-abi-shared-with-deps-2.7.1+cpu.zip
+```
+
+To build the project, executable the following steps
+
+```bash
+mkdir build
+cd build
+cmake ..
+make -j4
+```
+
+After successful compilation, executate the program with:
+
+```base
+./g1_deploy_run {net_interface}
+```
+
+Replace `{net_interface}` with your actual network interface name (e.g., eth0, wlan0).
 
 ## 🎉 Acknowledgments
 
