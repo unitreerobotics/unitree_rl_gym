@@ -174,7 +174,7 @@ void Controller::run()
 		torch::Tensor output_tensor = module.forward(inputs).toTensor();
 		std::memcpy(act.data(), output_tensor.data_ptr<float>(), output_tensor.size(1) * sizeof(float));
 
-		auto low_cmd = mLowCmdBuf.GetDataPtr();
+		auto low_cmd = std::make_shared<unitree_hg::msg::dds_::LowCmd_>();
 		// leg
 		for (int i = 0; i < 12; i++)
 		{
@@ -210,7 +210,7 @@ void Controller::damp()
 
 	while (true)
 	{
-		auto low_cmd = mLowCmdBuf.GetDataPtr();
+		auto low_cmd = std::make_shared<unitree_hg::msg::dds_::LowCmd_>();
 		for (auto &cmd : low_cmd->motor_cmd())
 		{
 			cmd.kp() = 0;

@@ -8,7 +8,7 @@ include_directories(/usr/local/include/iceoryx/v2.0.2)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_PREFIX_PATH "/home/unitree197/Downloads/libtorch-cxx11-abi-shared-with-deps-2.7.1+cpu/libtorch/share/cmake")
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/libtorch-cxx11-abi-shared-with-deps-2.7.1+cpu/libtorch/share/cmake")
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 
