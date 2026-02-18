@@ -2,8 +2,6 @@ import os
 from datetime import datetime
 from typing import Tuple
 import torch
-import numpy as np
-import sys
 
 from rsl_rl.env import VecEnv
 from rsl_rl.runners import OnPolicyRunner
@@ -34,7 +32,7 @@ class TaskRegistry():
         return env_cfg, train_cfg
     
     def make_env(self, name, args=None, env_cfg=None) -> Tuple[VecEnv, LeggedRobotCfg]:
-        """ Creates an environment either from a registered namme or from the provided config file.
+        """ Creates an environment either from a registered name or from the provided config file.
 
         Args:
             name (string): Name of a registered env.
@@ -73,7 +71,7 @@ class TaskRegistry():
         return env, env_cfg
 
     def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default") -> Tuple[OnPolicyRunner, LeggedRobotCfgPPO]:
-        """ Creates the training algorithm  either from a registered namme or from the provided config file.
+        """ Creates the training algorithm  either from a registered name or from the provided config file.
 
         Args:
             env (isaacgym.VecTaskPython): The environment to train (TODO: remove from within the algorithm)

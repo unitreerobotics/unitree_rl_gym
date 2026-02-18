@@ -1,7 +1,5 @@
 import sys
-from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
-import sys
 from legged_gym import LEGGED_GYM_ROOT_DIR
 
 import isaacgym
@@ -45,7 +43,5 @@ def play(args):
 
 if __name__ == '__main__':
     EXPORT_POLICY = True
-    RECORD_FRAMES = False
-    MOVE_CAMERA = False
     args = get_args()
     play(args)

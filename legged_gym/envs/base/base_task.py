@@ -1,12 +1,13 @@
 
 import sys
+from abc import ABC, abstractmethod
 from isaacgym import gymapi
 from isaacgym import gymutil
 import numpy as np
 import torch
 
 # Base class for RL tasks
-class BaseTask():
+class BaseTask(ABC):
 
     def __init__(self, cfg, sim_params, physics_engine, sim_device, headless):
         self.gym = gymapi.acquire_gym()
@@ -75,9 +76,9 @@ class BaseTask():
     def get_privileged_observations(self):
         return self.privileged_obs_buf
 
+    @abstractmethod
     def reset_idx(self, env_ids):
         """Reset selected robots"""
-        raise NotImplementedError
 
     def reset(self):
         """ Reset all robots"""
@@ -85,8 +86,9 @@ class BaseTask():
         obs, privileged_obs, _, _, _ = self.step(torch.zeros(self.num_envs, self.num_actions, device=self.device, requires_grad=False))
         return obs, privileged_obs
 
+    @abstractmethod
     def step(self, actions):
-        raise NotImplementedError
+        """Step the simulation by one policy timestep."""
 
     def render(self, sync_frame_time=True):
         if self.viewer:

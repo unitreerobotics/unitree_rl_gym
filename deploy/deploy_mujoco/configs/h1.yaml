@@ -20,6 +20,7 @@ dof_pos_scale: 1.0
 dof_vel_scale: 0.05
 action_scale: 0.25
 cmd_scale: [2.0, 2.0, 0.25]
+max_cmd: [0.8, 0.5, 1.57]  # [lin_vel_x, lin_vel_y, ang_vel_yaw] — must match deploy_real config
 num_actions: 10
 num_obs: 41
 

@@ -4,8 +4,7 @@ import numpy as np
 import time
 import torch
 
-from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
-from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
+from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_, unitree_hg_msg_dds__LowState_
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_, unitree_go_msg_dds__LowState_
 from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as LowCmdHG
@@ -159,7 +158,9 @@ class Controller:
 
         # imu_state quaternion: w, x, y, z
         quat = self.low_state.imu_state.quaternion
-        ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
+        # gyroscope is a 3-element sequence; avoid wrapping in an extra list
+        # which would produce shape (1, 3) instead of the expected (3,)
+        ang_vel = np.array(self.low_state.imu_state.gyroscope, dtype=np.float32)
 
         if self.config.imu_type == "torso":
             # h1 and h1_2 imu is on the torso
