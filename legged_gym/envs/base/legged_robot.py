@@ -1,6 +1,5 @@
-from legged_gym import LEGGED_GYM_ROOT_DIR, envs
+from legged_gym import LEGGED_GYM_ROOT_DIR
 import time
-from warnings import WarningMessage
 import numpy as np
 import os
 
@@ -8,10 +7,8 @@ from isaacgym.torch_utils import *
 from isaacgym import gymtorch, gymapi, gymutil
 
 import torch
-from torch import Tensor
 from typing import Tuple, Dict
 
-from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.envs.base.base_task import BaseTask
 from legged_gym.utils.math import wrap_to_pi
 from legged_gym.utils.isaacgym_utils import get_euler_xyz as get_euler_xyz_in_tensor
@@ -142,6 +139,10 @@ class LeggedRobot(BaseTask):
 
         self._resample_commands(env_ids)
 
+        # update terrain curriculum before repositioning robots
+        if self.cfg.terrain.curriculum:
+            self._update_terrain_curriculum(env_ids)
+
         # reset buffers
         self.actions[env_ids] = 0.
         self.last_actions[env_ids] = 0.
@@ -154,6 +155,8 @@ class LeggedRobot(BaseTask):
         for key in self.episode_sums.keys():
             self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             self.episode_sums[key][env_ids] = 0.
+        if self.cfg.terrain.curriculum:
+            self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
         # send timeout info to the algorithm
@@ -374,8 +377,12 @@ class LeggedRobot(BaseTask):
         if len(push_env_ids) == 0:
             return
         max_vel = self.cfg.domain_rand.max_push_vel_xy
-        self.root_states[:, 7:9] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 2), device=self.device) # lin vel x/y
-        
+        # Only write into the rows that will actually be committed to the simulator.
+        # The previous code wrote to self.root_states[:] (all envs), which corrupted
+        # the cached velocity of non-pushed environments and caused incorrect
+        # base_lin_vel / base_ang_vel observations on the next physics step.
+        self.root_states[push_env_ids, 7:9] = torch_rand_float(-max_vel, max_vel, (len(push_env_ids), 2), device=self.device) # lin vel x/y
+
         env_ids_int32 = push_env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                     gymtorch.unwrap_tensor(self.root_states),
@@ -383,6 +390,45 @@ class LeggedRobot(BaseTask):
 
    
     
+    def _update_terrain_curriculum(self, env_ids):
+        """ Implements a curriculum of increasing terrain difficulty.
+
+        Robots that travel more than half the terrain-platform length during an
+        episode are promoted to the next harder difficulty level; robots that
+        fall short are demoted one level.  Terrain levels are clamped to
+        [0, num_rows - 1] so they never go out of bounds.  After updating the
+        level, each environment's world-space origin is refreshed from the
+        pre-computed terrain_origins lookup table.
+
+        This method is a no-op until after the first full reset (self.init_done),
+        so the very first episode always starts on the initialised level.
+
+        Args:
+            env_ids (List[int]): ids of environments being reset
+        """
+        if not self.init_done:
+            # Skip on the very first call — terrain_levels were set in _get_env_origins
+            return
+
+        # Measure how far each resetting robot moved from its terrain-platform centre
+        distance = torch.norm(
+            self.root_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1
+        )
+
+        # Promote if the robot covered more than half a platform length, else demote
+        move_up   = distance > self.terrain.env_length / 2
+        move_down = ~move_up
+
+        self.terrain_levels[env_ids] += move_up.long() - move_down.long()
+        self.terrain_levels[env_ids] = torch.clamp(
+            self.terrain_levels[env_ids], 0, self.cfg.terrain.num_rows - 1
+        )
+
+        # Update world origins for the reset environments
+        self.env_origins[env_ids] = self.terrain_origins[
+            self.terrain_levels[env_ids], self.terrain_types[env_ids]
+        ]
+
     def update_command_curriculum(self, env_ids):
         """ Implements a curriculum of increasing commands
 
@@ -608,17 +654,28 @@ class LeggedRobot(BaseTask):
         """ Sets environment origins. On rough terrain the origins are defined by the terrain platforms.
             Otherwise create a grid.
         """
-      
-        self.custom_origins = False
-        self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
-        # create a grid of robots
-        num_cols = np.floor(np.sqrt(self.num_envs))
-        num_rows = np.ceil(self.num_envs / num_cols)
-        xx, yy = torch.meshgrid(torch.arange(num_rows), torch.arange(num_cols))
-        spacing = self.cfg.env.env_spacing
-        self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs]
-        self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs]
-        self.env_origins[:, 2] = 0.
+        if self.cfg.terrain.mesh_type in ["heightfield", "trimesh"]:
+            self.custom_origins = True
+            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
+            # Store terrain origins as a tensor for fast indexed lookup during curriculum updates
+            self.terrain_origins = torch.from_numpy(self.terrain.env_origins).to(self.device).to(torch.float)
+            # Assign each environment a terrain type (column) spread evenly across columns
+            self.terrain_types = torch.randint(0, self.cfg.terrain.num_cols, (self.num_envs,), device=self.device)
+            # Start all environments at a random level up to max_init_terrain_level
+            max_init = min(self.cfg.terrain.max_init_terrain_level, self.cfg.terrain.num_rows - 1)
+            self.terrain_levels = torch.randint(0, max_init + 1, (self.num_envs,), device=self.device)
+            self.env_origins[:] = self.terrain_origins[self.terrain_levels, self.terrain_types]
+        else:
+            self.custom_origins = False
+            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
+            # create a grid of robots
+            num_cols = np.floor(np.sqrt(self.num_envs))
+            num_rows = np.ceil(self.num_envs / num_cols)
+            xx, yy = torch.meshgrid(torch.arange(num_rows), torch.arange(num_cols))
+            spacing = self.cfg.env.env_spacing
+            self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs]
+            self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs]
+            self.env_origins[:, 2] = 0.
 
     def _parse_cfg(self, cfg):
         self.dt = self.cfg.control.decimation * self.sim_params.dt
