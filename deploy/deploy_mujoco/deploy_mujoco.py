@@ -55,10 +55,11 @@ if __name__ == "__main__":
         dof_vel_scale = config["dof_vel_scale"]
         action_scale = config["action_scale"]
         cmd_scale = np.array(config["cmd_scale"], dtype=np.float32)
+        max_cmd = np.array(config["max_cmd"], dtype=np.float32)
 
         num_actions = config["num_actions"]
         num_obs = config["num_obs"]
-        
+
         cmd = np.array(config["cmd_init"], dtype=np.float32)
 
     # define context variables
@@ -110,7 +111,9 @@ if __name__ == "__main__":
 
                 obs[:3] = omega
                 obs[3:6] = gravity_orientation
-                obs[6:9] = cmd * cmd_scale
+                # Multiply by max_cmd to match the observation space the policy was
+                # trained on (deploy_real uses cmd * cmd_scale * max_cmd).
+                obs[6:9] = cmd * cmd_scale * max_cmd
                 obs[9 : 9 + num_actions] = qj
                 obs[9 + num_actions : 9 + 2 * num_actions] = dqj
                 obs[9 + 2 * num_actions : 9 + 3 * num_actions] = action

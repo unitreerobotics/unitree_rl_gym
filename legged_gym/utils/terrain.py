@@ -29,7 +29,7 @@ class Terrain:
 
         self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
         if cfg.curriculum:
-            self.curiculum()
+            self.curriculum()
         elif cfg.selected:
             self.selected_terrain()
         else:    
@@ -52,7 +52,7 @@ class Terrain:
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
         
-    def curiculum(self):
+    def curriculum(self):
         for j in range(self.cfg.num_cols):
             for i in range(self.cfg.num_rows):
                 difficulty = i / self.cfg.num_rows
@@ -69,11 +69,11 @@ class Terrain:
 
             terrain = terrain_utils.SubTerrain("terrain",
                               width=self.width_per_env_pixels,
-                              length=self.width_per_env_pixels,
-                              vertical_scale=self.vertical_scale,
-                              horizontal_scale=self.horizontal_scale)
+                              length=self.length_per_env_pixels,   # was width_per_env_pixels — wrong dimension
+                              vertical_scale=self.cfg.vertical_scale,   # was self.vertical_scale — attribute doesn't exist
+                              horizontal_scale=self.cfg.horizontal_scale)  # was self.horizontal_scale — attribute doesn't exist
 
-            eval(terrain_type)(terrain, **self.cfg.terrain_kwargs.terrain_kwargs)
+            eval(terrain_type)(terrain, **self.cfg.terrain_kwargs)
             self.add_terrain_to_map(terrain, i, j)
     
     def make_terrain(self, choice, difficulty):
