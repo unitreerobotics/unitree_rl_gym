@@ -47,11 +47,19 @@ resources/robots/ybt/
 这些是已跑通短测的**仿真起始参数**，并非实机增益或已经优化到最优的控制参数。
 出生机身高度 `0.55 m`，奖励目标高度 `0.50 m`。
 
+针对首轮训练暴露出的**走路拖沓/迈不开脚、走几秒就歪**，做了如下调整：
+
+- `heading_command = True`：恢复朝向闭环。基类（go2 等）默认就开，原先只追踪偏航**速率**，残留的小偏航率几乎不受惩罚却会累积成明显偏航。注意：开启后偏航由"朝向误差"闭环生成，play 的 `--cmd_wz` 不再直接生效（`--cmd_vx/--cmd_vy` 正常，机器人会保持朝向走直线）。
+- 新增 `feet_clearance` 奖励（`YBTRobot._reward_feet_clearance`）：摆动腿离地高度超过 `feet_clearance_target = 0.05 m` 就给分（`feet_clearance_cap = 0.09 m` 封顶），且**钳制在 ≥0**。拖地的脚得 0 分、抬起的脚得正分，所以策略没有"索性不抬腿"的动机。权重 `feet_clearance = 0.3`：该项是速度追踪的**从属项**——初版取 1.0 时它一度占到总奖励的约 85%，机器人变成高抬腿踏步；上限压到 0.09 m 也让它抬过正常步高后不再有额外收益。
+- 其余奖励保持基类默认：`tracking_ang_vel = 0.5`、`feet_air_time = 1.0`（含基类 0.5 s 阈值）、`action_rate = -0.01`。实测 go2 收敛时 `feet_air_time` 也是负的（约 −0.008）却走得很好，说明该值为负并不等于拖沓；把它抬高反而会诱导拖腿。
+
+以上改动了奖励函数，`logs/flat_ybt/` 下的旧检查点需重新训练。
+
 ## 3. 默认训练参数
 
 | 参数 | 默认值 |
 | --- | --- |
-| 并行环境 | 4096 |
+| 并行环境 | 12288 |
 | PPO 迭代上限 | 1500 |
 | 每次迭代每环境采样步数 | 24 |
 | 动作维度 / 观测维度 | 12 / 48 |
@@ -63,7 +71,7 @@ resources/robots/ybt/
 | 地形 | 平地，无地形课程 |
 
 48 维观测依次为：机身线速度 3、机身角速度 3、重力方向 3、速度命令 3、关节位置偏差 12、关节速度 12、上一动作 12。当前不包含步态相位。
-默认每迭代采集 `4096 × 24 = 98,304` 条转换；1500 次迭代共 `147,456,000` 条。
+默认每迭代采集 `12288 × 24 = 294,912` 条转换；1500 次迭代共 `442,368,000` 条。
 **1500 是训练预算，不保证固定次数后就能获得理想步态。** 用 Play 检查站立、前后移动、侧移、转向与抗扰表现后，再决定是否继续训练或调整奖励。
 
 ## 4. 怎么启动
@@ -74,11 +82,11 @@ resources/robots/ybt/
 conda activate unitree-rl
 cd /home/yh/unitree_rl_gym
 
-# 正式训练：默认 4096 环境、1500 次迭代
+# 正式训练：默认 12288 环境、1500 次迭代
 python legged_gym/scripts/train.py --task=ybt --headless
 
 # 显存紧张时，可以减小并行数量
-python legged_gym/scripts/train.py --task=ybt --num_envs=1024 --headless
+python legged_gym/scripts/train.py --task=ybt --num_envs=4096 --headless
 
 # 查看正式训练结果并导出 actor
 python legged_gym/scripts/play.py --task=ybt --num_envs=16

@@ -67,7 +67,7 @@ class YBTTests(unittest.TestCase):
 
     def test_training_defaults(self):
         ppo = YBTFlatCfgPPO()
-        self.assertEqual(self.cfg.env.num_envs, 4096)
+        self.assertEqual(self.cfg.env.num_envs, 12288)
         self.assertEqual((self.cfg.env.num_actions, self.cfg.env.num_observations), (12, 48))
         self.assertAlmostEqual(self.cfg.sim.dt * self.cfg.control.decimation, 0.02)
         self.assertEqual(ppo.runner.num_steps_per_env, 24)
@@ -107,6 +107,27 @@ class YBTTests(unittest.TestCase):
             foot_height = self.cfg.init_state.pos[2] + transforms[leg + "_foot"][2, 3]
             self.assertGreater(foot_height - radius, 0.0)
             self.assertLess(foot_height - radius, 0.10)
+
+    def test_feet_clearance_rewards_lifted_feet(self):
+        # The clearance term must pay for lifting a swing foot and must never go
+        # negative for a dragged foot, otherwise the policy is pushed to drag.
+        robot = object.__new__(YBTRobot)
+        robot.cfg = self.cfg
+        robot.feet_indices = torch.arange(4)
+        robot.contact_forces = torch.zeros(2, 6, 3)
+        robot.rigid_body_states = torch.zeros(2, 6, 13)
+        target = self.cfg.rewards.feet_clearance_target
+        cap = self.cfg.rewards.feet_clearance_cap
+        self.assertGreater(target, 0.03)  # above the foot collision-sphere radius
+        robot.rigid_body_states[:, :4, 2] = target
+        robot.contact_forces[:, :4, 2] = 5.0  # resting feet: no reward
+        self.assertEqual(robot._reward_feet_clearance().sum().item(), 0.0)
+        robot.rigid_body_states[:, :4, 2] = cap  # feet lifted to the cap
+        robot.contact_forces[:, :4, 2] = 0.0     # and out of contact
+        rew = robot._reward_feet_clearance()
+        self.assertTrue(torch.allclose(rew, torch.full_like(rew, 4.0)))
+        robot.contact_forces[:, :4, 2] = 5.0     # a high foot still in contact: no reward
+        self.assertEqual(robot._reward_feet_clearance().sum().item(), 0.0)
 
     def test_rejects_invalid_default_angles(self):
         bad = copy.deepcopy(self.cfg)

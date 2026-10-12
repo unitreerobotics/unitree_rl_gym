@@ -5,7 +5,7 @@ class YBTFlatCfg(LeggedRobotCfg):
     """Starting simulation configuration for the 61.67 kg YBT URDF."""
 
     class env(LeggedRobotCfg.env):
-        num_envs = 4096
+        num_envs = 12288
         num_actions = 12
         num_observations = 48
         num_privileged_obs = None
@@ -17,7 +17,10 @@ class YBTFlatCfg(LeggedRobotCfg):
         measure_heights = False
 
     class commands(LeggedRobotCfg.commands):
-        heading_command = False
+        # Heading is regulated closed-loop from a target heading; without it the
+        # policy only matches the yaw *rate* and any small uncorrected bias makes
+        # the robot drift off a straight line.
+        heading_command = True
         curriculum = False
 
         class ranges(LeggedRobotCfg.commands.ranges):
@@ -74,12 +77,25 @@ class YBTFlatCfg(LeggedRobotCfg):
         soft_dof_pos_limit = 0.9
         base_height_target = 0.50
         max_contact_force = 500.0
+        # Swing-foot clearance reward (YBTRobot._reward_feet_clearance). A foot
+        # body lifted between feet_clearance_target and feet_clearance_cap [m]
+        # above the ground scores; the foot collision sphere has radius 0.03, so
+        # a resting foot origin sits at ~0.03-0.04 m. The term is clamped at >= 0
+        # so dragging a foot (reward 0) is never better than lifting it -- that
+        # was the failure mode of raising the base air-time reward. The cap is
+        # kept low so lifting past a normal trot height earns nothing (no
+        # marching); see the weight note on feet_clearance below.
+        feet_clearance_target = 0.05
+        feet_clearance_cap = 0.09
 
         class scales(LeggedRobotCfg.rewards.scales):
             torques = -0.00001
             orientation = -1.0
             base_height = -1.0
             dof_pos_limits = -10.0
+            # Secondary to velocity tracking: at 1.0 this term reached ~85% of
+            # the total reward and the robot marched instead of walking.
+            feet_clearance = 0.3
 
     class sim(LeggedRobotCfg.sim):
         dt = 0.005  # 200 Hz physics; decimation=4 gives 50 Hz policy

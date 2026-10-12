@@ -63,6 +63,31 @@ class YBTRobot(LeggedRobot):
         if self.termination_contact_indices.numel() != 1 or torch.any(self.termination_contact_indices < 0):
             raise ValueError("YBT termination contact must identify the trunk")
 
+    def _init_buffers(self):
+        super()._init_buffers()
+        # The clearance reward needs the world position of the four foot bodies.
+        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state).view(
+            self.num_envs, self.num_bodies, 13)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+    def _post_physics_step_callback(self):
+        super()._post_physics_step_callback()
+        # Refresh before the rewards are computed in post_physics_step.
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+    def _reward_feet_clearance(self):
+        # Reward swing feet for clearing the ground. Clamped at >= 0 so a foot
+        # dragged along the floor (reward 0) is never better than one lifted off
+        # it; the base air-time reward had the opposite incentive, which the
+        # policy exploited by dragging its legs.
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.
+        foot_z = self.rigid_body_states[:, self.feet_indices, 2]
+        target = self.cfg.rewards.feet_clearance_target
+        cap = self.cfg.rewards.feet_clearance_cap
+        clearance = ((foot_z - target) / (cap - target)).clip(min=0., max=1.)
+        return torch.sum(clearance * (~contact), dim=1)
+
     def _reset_dofs(self, env_ids):
         # YBT knees have positive-only limits. Multiplying 1.6 by 0.5 can
         # produce 0.8 < the URDF lower limit (1.0297), so use additive noise.
