@@ -11,8 +11,13 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.envs.base.legged_robot import LeggedRobot
 
 
-def validate_ybt_asset(cfg):
-    """Fail early on missing meshes, mismatched joints or an invalid standing pose."""
+def validate_ybt_asset(cfg, flat_ground_only=True):
+    """Fail early on missing meshes, mismatched joints or an invalid standing pose.
+
+    ``flat_ground_only`` is what the flat ``ybt`` task asserts about itself: its
+    rewards measure heights against z = 0, which is only true on a ground plane.
+    The staircase task passes ``False`` because it has replaced those rewards.
+    """
     path = Path(cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR))
     if not path.is_file() or path.stat().st_size == 0:
         raise FileNotFoundError("YBT URDF is missing or empty: {}".format(path))
@@ -27,7 +32,7 @@ def validate_ybt_asset(cfg):
         raise ValueError("YBT requires 12 movable joints matching default_joint_angles")
     if cfg.env.num_actions != 12 or cfg.env.num_observations != 48:
         raise ValueError("YBT uses 12 actions and the base environment's 48 observations")
-    if cfg.terrain.mesh_type != "plane":
+    if flat_ground_only and cfg.terrain.mesh_type != "plane":
         raise ValueError("The YBT task currently implements flat-ground training only")
     if not math.isfinite(cfg.init_state.joint_angle_noise) or cfg.init_state.joint_angle_noise < 0:
         raise ValueError("joint_angle_noise must be a finite nonnegative number")
