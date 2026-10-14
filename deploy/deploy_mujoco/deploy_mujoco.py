@@ -58,6 +58,7 @@ if __name__ == "__main__":
 
         num_actions = config["num_actions"]
         num_obs = config["num_obs"]
+        joint_names = config.get("joint_names")
         
         cmd = np.array(config["cmd_init"], dtype=np.float32)
 
@@ -70,6 +71,15 @@ if __name__ == "__main__":
 
     # Load robot model
     m = mujoco.MjModel.from_xml_path(xml_path)
+    if joint_names is not None:
+        joint_qpos_ids = np.array([m.joint(name).qposadr[0] for name in joint_names], dtype=np.int32)
+        joint_qvel_ids = np.array([m.joint(name).dofadr[0] for name in joint_names], dtype=np.int32)
+        actuator_names = config.get("actuator_names", joint_names)
+        actuator_ids = np.array([m.actuator(name).id for name in actuator_names], dtype=np.int32)
+    else:
+        joint_qpos_ids = np.arange(7, 7 + num_actions)
+        joint_qvel_ids = np.arange(6, 6 + num_actions)
+        actuator_ids = np.arange(num_actions)
     d = mujoco.MjData(m)
     m.opt.timestep = simulation_dt
 
@@ -81,8 +91,10 @@ if __name__ == "__main__":
         start = time.time()
         while viewer.is_running() and time.time() - start < simulation_duration:
             step_start = time.time()
-            tau = pd_control(target_dof_pos, d.qpos[7:], kps, np.zeros_like(kds), d.qvel[6:], kds)
-            d.ctrl[:] = tau
+            q = d.qpos[joint_qpos_ids]
+            dq = d.qvel[joint_qvel_ids]
+            tau = pd_control(target_dof_pos, q, kps, np.zeros_like(kds), dq, kds)
+            d.ctrl[actuator_ids] = tau
             # mj_step can be replaced with code that also evaluates
             # a policy and applies a control signal before stepping the physics.
             mujoco.mj_step(m, d)
@@ -92,8 +104,8 @@ if __name__ == "__main__":
                 # Apply control signal here.
 
                 # create observation
-                qj = d.qpos[7:]
-                dqj = d.qvel[6:]
+                qj = d.qpos[joint_qpos_ids]
+                dqj = d.qvel[joint_qvel_ids]
                 quat = d.qpos[3:7]
                 omega = d.qvel[3:6]
 

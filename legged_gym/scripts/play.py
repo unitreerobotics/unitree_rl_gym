@@ -27,6 +27,24 @@ def play(args):
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
+
+    # Optionally hold the velocity command fixed instead of leaving it random.
+    # The environment re-randomizes commands every resampling_time and on every
+    # reset, so override the one place that writes them rather than setting
+    # env.commands once (that would be undone a few hundred steps later).
+    if any(c is not None for c in (args.cmd_vx, args.cmd_vy, args.cmd_wz)):
+        fixed_command = torch.tensor(
+            [0.0 if c is None else c for c in (args.cmd_vx, args.cmd_vy, args.cmd_wz)],
+            device=env.device)
+
+        def _resample_commands(env_ids, _cmd=fixed_command):
+            if len(env_ids):
+                env.commands[env_ids, :3] = _cmd
+
+        env._resample_commands = _resample_commands
+        env.commands[:, :3] = fixed_command
+        print("Holding the command fixed at vx=%+.2f vy=%+.2f wz=%+.2f" % tuple(fixed_command.tolist()))
+
     obs = env.get_observations()
     # load policy
     train_cfg.runner.resume = True

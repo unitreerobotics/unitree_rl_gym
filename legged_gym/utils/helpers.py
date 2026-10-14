@@ -134,6 +134,10 @@ def get_args():
         {"name": "--num_envs", "type": int, "help": "Number of environments to create. Overrides config file if provided."},
         {"name": "--seed", "type": int, "help": "Random seed. Overrides config file if provided."},
         {"name": "--max_iterations", "type": int, "help": "Maximum number of training iterations. Overrides config file if provided."},
+
+        {"name": "--cmd_vx", "type": float, "default": None, "help": "Play/inspection: hold the forward velocity command fixed at this value [m/s] instead of re-randomizing it. Unset: keep the environment's random commands"},
+        {"name": "--cmd_vy", "type": float, "default": None, "help": "Play/inspection: hold the lateral velocity command fixed [m/s]. Defaults to 0 when any --cmd_* is given"},
+        {"name": "--cmd_wz", "type": float, "default": None, "help": "Play/inspection: hold the yaw rate command fixed [rad/s]. Defaults to 0 when any --cmd_* is given"},
     ]
     # parse arguments
     args = gymutil.parse_arguments(
